@@ -10,13 +10,28 @@ export function SettingsTab({
   carClasses = [], 
   setCarClasses = () => {}, 
   categories = ['Шиномонтаж', 'Ремонт'],
-  onSaveServices // Добавили принятие пропса из App.js
+  onSaveServices 
 }) {
   const [newServiceName, setNewServiceName] = useState('');
   const [newCarClassName, setNewCarClassName] = useState('');
   const [selectedCategory, setSelectedCategory] = useState(categories[0] || 'Шиномонтаж');
 
-  // Добавление нового класса автомобиля в виде объекта
+  // Вспомогательная функция для безопасного сохранения всего стейта в облако
+  const saveAllToCloud = async (services, classes) => {
+    try {
+      const payload = {
+        services: services,
+        carClasses: classes
+      };
+      const success = await updateCloudServices(payload);
+      return success;
+    } catch (e) {
+      console.error('Ошибка облака:', e);
+      return false;
+    }
+  };
+
+  // Добавление нового класса автомобиля
   const handleAddCarClass = async () => {
     const trimmed = newCarClassName.trim();
     if (!trimmed) {
@@ -24,7 +39,6 @@ export function SettingsTab({
       return;
     }
 
-    // Проверяем, нет ли уже такого класса
     const exists = carClasses.some(cls => {
       const name = typeof cls === 'object' && cls !== null ? (cls.name || cls.id) : cls;
       return name.toLowerCase() === trimmed.toLowerCase();
@@ -35,7 +49,6 @@ export function SettingsTab({
       return;
     }
 
-    // Создаем объект класса, чтобы не ломать логику в калькуляторе и закатах
     const newClassObj = {
       id: trimmed,
       name: trimmed
@@ -44,7 +57,6 @@ export function SettingsTab({
     const updatedClasses = [...carClasses, newClassObj];
     setCarClasses(updatedClasses);
 
-    // Добавляем этот класс в матрицу цен существующих услуг со значением 0
     const updatedServices = servicesList.map(service => ({
       ...service,
       prices: {
@@ -55,16 +67,11 @@ export function SettingsTab({
 
     setServicesList(updatedServices);
     
-    try {
-      const success = await updateCloudServices(updatedServices);
-      if (success) {
-        Alert.alert('Успех', `Класс "${trimmed}" успешно добавлен и сохранен в облако!`);
-      } else {
-        Alert.alert('Внимание', 'Класс добавлен локально, но не удалось сохранить в облако.');
-      }
-    } catch (e) {
-      console.error('Ошибка облака:', e);
-      Alert.alert('Ошибка', 'Не удалось отправить данные в облако.');
+    const success = await saveAllToCloud(updatedServices, updatedClasses);
+    if (success) {
+      Alert.alert('Успех', `Класс "${trimmed}" успешно добавлен и сохранен в облако!`);
+    } else {
+      Alert.alert('Внимание', 'Класс добавлен локально, но не удалось сохранить в облако.');
     }
 
     setNewCarClassName('');
@@ -92,7 +99,6 @@ export function SettingsTab({
     
     setCarClasses(updatedClasses);
 
-    // Удаляем этот класс из цен услуг
     const updatedServices = servicesList.map(service => {
       const newPrices = { ...(service.prices || {}) };
       delete newPrices[classId];
@@ -101,15 +107,15 @@ export function SettingsTab({
 
     setServicesList(updatedServices);
     
-    try {
-      await updateCloudServices(updatedServices);
+    const success = await saveAllToCloud(updatedServices, updatedClasses);
+    if (success) {
       Alert.alert('Успех', `Класс "${className}" удален`);
-    } catch (e) {
-      console.error('Ошибка удаления в облаке:', e);
+    } else {
+      Alert.alert('Внимание', 'Удалено локально, но произошла ошибка при обновлении облака.');
     }
   };
 
-  // Добавление новой услуги с пустой матрицей цен
+  // Добавление новой услуги
   const handleAddService = async () => {
     const trimmedName = newServiceName.trim();
     if (!trimmedName) {
@@ -142,7 +148,7 @@ export function SettingsTab({
     const updated = [...(servicesList || []), newService];
     setServicesList(updated);
     
-    const success = await updateCloudServices(updated);
+    const success = await saveAllToCloud(updated, carClasses);
     if (success) {
       Alert.alert('Успех', `Услуга "${trimmedName}" добавлена и сохранена в облако!`);
     } else {
@@ -173,12 +179,12 @@ export function SettingsTab({
     setServicesList(updated);
   };
 
-  // Ручное сохранение всех изменений цен через функцию App.js (локально + облако)
+  // Ручное сохранение всех изменений цен
   const handleSaveToCloud = async () => {
     if (onSaveServices) {
       await onSaveServices(servicesList);
     } else {
-      const success = await updateCloudServices(servicesList);
+      const success = await saveAllToCloud(servicesList, carClasses);
       if (success) {
         Alert.alert('Успех', 'Все изменения цен успешно сохранены в облако!');
       } else {
@@ -191,9 +197,11 @@ export function SettingsTab({
   const handleDeleteService = async (id) => {
     const updated = servicesList.filter(s => s.id !== id);
     setServicesList(updated);
-    const success = await updateCloudServices(updated);
+    const success = await saveAllToCloud(updated, carClasses);
     if (success) {
       Alert.alert('Успех', 'Услуга успешно удалена');
+    } else {
+      Alert.alert('Внимание', 'Услуга удалена локально, но в облаке не обновилось.');
     }
   };
 
