@@ -1,9 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import bridge from '@vkontakte/vk-bridge';
-
-
-
-
 import {
   StyleSheet,
   Text,
@@ -22,10 +18,7 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
-export default function App() {
-  useEffect(() => {
-    bridge.send('VKWebAppInit');
-  }, []);
+
 const RADIUS_OPTIONS = [
   'R13',
   'R14',
@@ -127,7 +120,10 @@ const createEmptyPricesStructure = (classesList) => {
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('calc'); // 'calc' | 'history' | 'settings'
-  const [isLoaded, setIsLoaded] = useState(false);
+  const [isLoaded, setIsLoaded] = useState(false)
+     useEffect(() => {
+    bridge.send('VKWebAppInit');
+  }, []);
 
   // Справочники
   const [carClasses, setCarClasses] = useState(DEFAULT_CLASSES);
