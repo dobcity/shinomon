@@ -28,6 +28,7 @@ export const fetchCloudServices = async () => {
     return {
       services: data.services || null,
       carClasses: data.carClasses || null,
+      categories: data.categories || null, // ← Добавлена загрузка категорий
     };
   } catch (error) {
     console.error('Ошибка загрузки из облака JSONbin:', error);
@@ -44,6 +45,7 @@ export const updateCloudServices = async (payload) => {
     const updatedData = {
       services: payload.services !== undefined ? payload.services : current.services,
       carClasses: payload.carClasses !== undefined ? payload.carClasses : current.carClasses,
+      categories: payload.categories !== undefined ? payload.categories : current.categories, // ← Добавлено сохранение категорий
     };
 
     const response = await fetch(BASE_URL, {
