@@ -3,14 +3,13 @@ const API_KEY = '$2a$10$Q3PRvPm1RQEjwm7ll5VaPuDucTURtRSL23ltthf/WetwodziJe6um';
 
 const BASE_URL = `https://api.jsonbin.io/v3/b/${BIN_ID}`;
 
+// 1. Получение данных (без X-Master-Key, так как бин публичный для чтения)
 export const fetchCloudServices = async () => {
   try {
     const response = await fetch(`${BASE_URL}/latest`, {
       method: 'GET',
-      mode: 'cors',
       headers: {
         'Content-Type': 'application/json',
-        'X-Master-Key': API_KEY,
       },
     });
 
@@ -20,20 +19,20 @@ export const fetchCloudServices = async () => {
     }
 
     const data = await response.json();
-    return data?.record || data;
+    return data?.record || null;
   } catch (error) {
     console.error('[API GET Catch]', error);
     return null;
   }
 };
 
+// 2. Обновление данных (требует X-Master-Key для записи)
 export const updateCloudServices = async (newServicesList) => {
   try {
     const cleanData = JSON.parse(JSON.stringify(newServicesList || []));
 
     const response = await fetch(BASE_URL, {
       method: 'PUT',
-      mode: 'cors',
       headers: {
         'Content-Type': 'application/json',
         'X-Master-Key': API_KEY,
