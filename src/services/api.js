@@ -1,54 +1,71 @@
-const BIN_ID = '6a696f58da38895dfe9e2a0b';
-const API_KEY = '$2a$10$Q3PRvPm1RQEjwm7ll5VaPuDucTURtRSL23ltthf/WetwodziJe6um';
+import bridge from '@vkontakte/vk-bridge';
 
-const BASE_URL = `https://api.jsonbin.io/v3/b/${BIN_ID}`;
+const VK_KEYS = {
+  SERVICES: 'shinomontaj_services_v1',
+  CLASSES: 'shinomontaj_classes_v1',
+};
 
-// 1. Получение данных (без X-Master-Key, так как бин публичный для чтения)
+// Загрузка данных из облака VK
 export const fetchCloudServices = async () => {
   try {
-    const response = await fetch(`${BASE_URL}/latest`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+    const data = await bridge.send('VKWebAppStorageGet', {
+      keys: [VK_KEYS.SERVICES, VK_KEYS.CLASSES],
     });
 
-    if (!response.ok) {
-      console.error(`[API GET Error] Статус: ${response.status}`);
-      return null;
-    }
+    let services = null;
+    let carClasses = null;
 
-    const data = await response.json();
-    return data?.record || null;
+    data.keys.forEach((item) => {
+      if (item.key === VK_KEYS.SERVICES && item.value) {
+        try {
+          services = JSON.parse(item.value);
+        } catch (e) {
+          console.error('Ошибка парсинга услуг из VK Storage', e);
+        }
+      }
+      if (item.key === VK_KEYS.CLASSES && item.value) {
+        try {
+          carClasses = JSON.parse(item.value);
+        } catch (e) {
+          console.error('Ошибка парсинга классов из VK Storage', e);
+        }
+      }
+    });
+
+    return { services, carClasses };
   } catch (error) {
-    console.error('[API GET Catch]', error);
+    console.error('[VK Storage GET Error]', error);
     return null;
   }
 };
 
-// 2. Обновление данных (требует X-Master-Key для записи)
-export const updateCloudServices = async (newServicesList) => {
+// Сохранение данных в облако VK
+export const updateCloudServices = async (payload) => {
   try {
-    const cleanData = JSON.parse(JSON.stringify(newServicesList || []));
+    const requests = [];
 
-    const response = await fetch(BASE_URL, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Master-Key': API_KEY,
-      },
-      body: JSON.stringify(cleanData),
-    });
-
-    if (!response.ok) {
-      const errText = await response.text();
-      console.error(`Ошибка сохранения в облако (${response.status}): ${errText}`);
-      return false;
+    if (payload.services) {
+      requests.push(
+        bridge.send('VKWebAppStorageSet', {
+          key: VK_KEYS.SERVICES,
+          value: JSON.stringify(payload.services),
+        })
+      );
     }
 
+    if (payload.carClasses) {
+      requests.push(
+        bridge.send('VKWebAppStorageSet', {
+          key: VK_KEYS.CLASSES,
+          value: JSON.stringify(payload.carClasses),
+        })
+      );
+    }
+
+    await Promise.all(requests);
     return true;
   } catch (error) {
-    console.error('Сетевая ошибка при отправке в облако:', error);
+    console.error('[VK Storage SET Error]', error);
     return false;
   }
 };
