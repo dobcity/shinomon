@@ -26,7 +26,9 @@ export const fetchCloudServices = async () => {
     const data = await response.json();
 
     // 🔍 ТЕСТОВЫЙ ВЫВОД В КОНСОЛЬ
-    console.log('--- ДАННЫЕ ИЗ ОБЛАКА ---', data.record);
+   // Замените console.log на alert:
+alert('Данные из облака: ' + JSON.stringify(data.record));
+
     console.log('Это массив?', Array.isArray(data.record));
 
     return data.record;
