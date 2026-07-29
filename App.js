@@ -104,7 +104,17 @@ export default function App() {
     }
   };
 
-  // 3. Секретный вход для админа
+  // 3. Сохранение классов автомобилей локально
+  const handleSaveCarClasses = async (newClasses) => {
+    setCarClasses(newClasses);
+    try {
+      await AsyncStorage.setItem(STORAGE_KEYS.CLASSES, JSON.stringify(newClasses));
+    } catch (e) {
+      console.error('Ошибка сохранения классов в хранилище:', e);
+    }
+  };
+
+  // 4. Секретный вход для админа
   const handleHeaderTap = () => {
     const nextTap = tapCount + 1;
     setTapCount(nextTap);
@@ -145,7 +155,7 @@ export default function App() {
     }
   };
 
-  // 4. Оформление заказа
+  // 5. Оформление заказа
   const handleCreateOrder = async (computedTotal) => {
     if (!selectedClass) return;
     const activeIds = Object.keys(selectedServices).filter((id) => selectedServices[id] > 0);
@@ -268,6 +278,7 @@ export default function App() {
           servicesList={servicesList}
           setServicesList={setServicesList}
           carClasses={carClasses}
+          setCarClasses={handleSaveCarClasses}
           onSaveServices={handleSaveServices}
         />
       )}
