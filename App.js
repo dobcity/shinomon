@@ -8,6 +8,7 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
+  Platform,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -21,15 +22,18 @@ import { getIsAdmin } from './src/utils/vk';
 import { savePhotoPermanently } from './src/utils/storage';
 import { CalculatorTab } from './src/components/CalculatorTab';
 
+// 🔑 ВАШ СЕКРЕТНЫЙ ПИН-КОД ДЛЯ ВХОДА (Можете изменить на свой)
+const ADMIN_PIN = '7777';
+
 export default function App() {
   const vkDetectedAdmin = getIsAdmin();
   const [adminOverride, setAdminOverride] = useState(false);
   const [tapCount, setTapCount] = useState(0);
 
-  // Итоговый флаг: если ВК подтвердил админа ИЛИ включен секретный режим
+  // Права админа есть, если их подставил ВК ИЛИ введен правильный ПИН-код
   const isAdmin = vkDetectedAdmin || adminOverride;
 
-  const [activeTab, setActiveTab] = useState('calc'); // 'calc' | 'history' | 'settings'
+  const [activeTab, setActiveTab] = useState('calc');
   const [isLoaded, setIsLoaded] = useState(false);
 
   const [carClasses, setCarClasses] = useState(DEFAULT_CLASSES);
@@ -68,20 +72,46 @@ export default function App() {
     }
   };
 
-  // 5 быстрых кликов на шапку переключают режим Администратора
+  // 5 быстро кликов + ввод ПИН-кода для администратора
   const handleHeaderTap = () => {
     const nextTap = tapCount + 1;
     setTapCount(nextTap);
+
     if (nextTap >= 5) {
-      const nextState = !adminOverride;
-      setAdminOverride(nextState);
       setTapCount(0);
-      Alert.alert(
-        'Режим администратора',
-        nextState
-          ? '🔓 Панель администратора принудительно ВКЛЮЧЕНА'
-          : '🔒 Панель администратора ВЫКЛЮЧЕНА'
-      );
+
+      if (adminOverride) {
+        setAdminOverride(false);
+        Alert.alert('Выход', 'Режим администратора отключен.');
+        return;
+      }
+
+      // Запрос пароля
+      if (Platform.OS === 'web') {
+        const pin = window.prompt('Введите ПИН-код администратора:');
+        if (pin === ADMIN_PIN) {
+          setAdminOverride(true);
+          Alert.alert('Успех', '🔓 Режим администратора включен!');
+        } else if (pin !== null) {
+          Alert.alert('Ошибка', 'Неверный ПИН-код!');
+        }
+      } else {
+        // Для iOS / Android
+        Alert.prompt('Вход для владельца', 'Введите ПИН-код:', [
+          { text: 'Отмена', style: 'cancel' },
+          {
+            text: 'Войти',
+            onPress: (pin) => {
+              if (pin === ADMIN_PIN) {
+                setAdminOverride(true);
+                Alert.alert('Успех', '🔓 Режим администратора включен!');
+              } else {
+                Alert.alert('Ошибка', 'Неверный ПИН-код!');
+              }
+            },
+          },
+        ]);
+      }
     }
   };
 
@@ -140,16 +170,12 @@ export default function App() {
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" />
-      
-      {/* Кликабельная шапка для секретного вызова меню */}
+
       <TouchableOpacity activeOpacity={0.8} onPress={handleHeaderTap} style={styles.header}>
         <Text style={styles.headerTitle}>🛞 Шиномонтаж Pro</Text>
-        <Text style={styles.headerSubtitle}>
-          {isAdmin ? 'Режим: Администратор' : 'Режим: Клиент'}
-        </Text>
       </TouchableOpacity>
 
-      {/* Панель навигации для администраторов */}
+      {/* Вкладки видны ТОЛЬКО если вы админ в ВК или ввели ПИН-код */}
       {isAdmin && (
         <View style={styles.tabBar}>
           <TouchableOpacity
@@ -203,9 +229,8 @@ export default function App() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f4f6f8' },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  header: { padding: 14, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#e9ecef' },
+  header: { padding: 16, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#e9ecef' },
   headerTitle: { fontSize: 20, fontWeight: 'bold' },
-  headerSubtitle: { fontSize: 11, color: '#6c757d', marginTop: 2 },
   tabBar: { flexDirection: 'row', backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#dee2e6' },
   tabButton: { flex: 1, paddingVertical: 12, alignItems: 'center' },
   tabButtonActive: { borderBottomWidth: 3, borderBottomColor: '#0d6efd' },
