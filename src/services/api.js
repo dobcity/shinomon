@@ -1,94 +1,64 @@
-import bridge from '@vkontakte/vk-bridge';
+// Ваши данные с jsonbin.io
+const BIN_ID = '6a696f58da38895dfe9e2a0b'; 
+const API_KEY = '$2a$10$Q3PRvPm1RQEjwm7ll5VaPuDucTURtRSL23ltthf/WetwodziJe6um';
 
-const VK_KEYS = {
-  SERVICES: 'shinomontaj_services_v1',
-  CLASSES: 'shinomontaj_classes_v1',
+const BASE_URL = `https://api.jsonbin.io/v3/b/${BIN_ID}`;
+
+const headers = {
+  'Content-Type': 'application/json',
+  'X-Master-Key': API_KEY,
 };
 
-// Вспомогательная функция для таймаута (3 секунды), чтобы приложение не висело
-const withTimeout = (promise, ms = 3000) => {
-  let timeoutId;
-  const timeoutPromise = new Promise((_, reject) => {
-    timeoutId = setTimeout(() => reject(new Error('VK Bridge timeout')), ms);
-  });
-  return Promise.race([promise, timeoutPromise]).finally(() => clearTimeout(timeoutId));
-};
-
-// Загрузка данных из общего облака группы VK с защитой от зависания
+// Загрузка данных из внешнего облака
 export const fetchCloudServices = async () => {
   try {
-    const data = await withTimeout(
-      bridge.send('VKWebAppStorageGet', {
-        keys: [VK_KEYS.SERVICES, VK_KEYS.CLASSES],
-        shared: true, // Общее хранилище сообщества для всех сотрудников
-      }),
-      3000
-    );
+    const response = await fetch(`${BASE_URL}/latest`, {
+      method: 'GET',
+      headers: headers,
+    });
 
-    let services = null;
-    let carClasses = null;
-
-    if (data && data.keys) {
-      data.keys.forEach((item) => {
-        if (item.key === VK_KEYS.SERVICES && item.value) {
-          try {
-            services = JSON.parse(item.value);
-          } catch (e) {
-            console.error('Ошибка парсинга услуг', e);
-          }
-        }
-        if (item.key === VK_KEYS.CLASSES && item.value) {
-          try {
-            carClasses = JSON.parse(item.value);
-          } catch (e) {
-            console.error('Ошибка парсинга классов', e);
-          }
-        }
-      });
+    if (!response.ok) {
+      throw new Error(`Ошибка сети: ${response.status}`);
     }
 
-    return { services, carClasses };
+    const json = await response.json();
+    // JSONbin оборачивает данные в защищенное поле record
+    const data = json.record || {};
+
+    return {
+      services: data.services || null,
+      carClasses: data.carClasses || null,
+    };
   } catch (error) {
-    console.log('ℹ️ VK Storage недоступен или тайм-аут, используем локальный кэш.');
+    console.error('Ошибка загрузки из облака JSONbin:', error);
     return null;
   }
 };
 
-// Сохранение данных в общее облако группы VK с защитой от зависания
+// Сохранение данных во внешнее облако
 export const updateCloudServices = async (payload) => {
   try {
-    const requests = [];
+    // Получаем текущие данные, чтобы не затереть то, что не передано в payload
+    const current = (await fetchCloudServices()) || {};
 
-    if (payload.services) {
-      requests.push(
-        withTimeout(
-          bridge.send('VKWebAppStorageSet', {
-            key: VK_KEYS.SERVICES,
-            value: JSON.stringify(payload.services),
-            shared: true, // Общее хранилище сообщества
-          }),
-          3000
-        )
-      );
+    const updatedData = {
+      services: payload.services !== undefined ? payload.services : current.services,
+      carClasses: payload.carClasses !== undefined ? payload.carClasses : current.carClasses,
+    };
+
+    const response = await fetch(BASE_URL, {
+      method: 'PUT',
+      headers: headers,
+      body: JSON.stringify(updatedData),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Ошибка сети при сохранении: ${response.status}`);
     }
 
-    if (payload.carClasses) {
-      requests.push(
-        withTimeout(
-          bridge.send('VKWebAppStorageSet', {
-            key: VK_KEYS.CLASSES,
-            value: JSON.stringify(payload.carClasses),
-            shared: true, // Общее хранилище сообщества
-          }),
-          3000
-        )
-      );
-    }
-
-    await Promise.all(requests);
     return true;
   } catch (error) {
-    console.log('ℹ️ Не удалось сохранить в VK Storage (тайм-аут или вне VK).');
+    console.error('Ошибка сохранения в облако JSONbin:', error);
     return false;
   }
 };
