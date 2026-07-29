@@ -8,6 +8,7 @@ export function SettingsTab({ servicesList = [], setServicesList, carClasses = [
   const [newServiceName, setNewServiceName] = useState('');
   const [selectedCategory, setSelectedCategory] = useState(categories[0] || 'Шиномонтаж');
 
+  // Добавление новой услуги с пустой матрицей цен
   const handleAddService = async () => {
     const trimmedName = newServiceName.trim();
     if (!trimmedName) {
@@ -50,6 +51,38 @@ export function SettingsTab({ servicesList = [], setServicesList, carClasses = [
     setNewServiceName('');
   };
 
+  // Изменение цены в матрице для конкретной услуги, класса и радиуса
+  const handlePriceChange = (serviceId, classId, radius, value) => {
+    const numericValue = value === '' ? 0 : Number(value);
+    const updated = servicesList.map(service => {
+      if (service.id === serviceId) {
+        return {
+          ...service,
+          prices: {
+            ...(service.prices || {}),
+            [classId]: {
+              ...(service.prices?.[classId] || {}),
+              [radius]: isNaN(numericValue) ? 0 : numericValue
+            }
+          }
+        };
+      }
+      return service;
+    });
+    setServicesList(updated);
+  };
+
+  // Ручное сохранение всех изменений цен в облако
+  const handleSaveToCloud = async () => {
+    const success = await updateCloudServices(servicesList);
+    if (success) {
+      Alert.alert('Успех', 'Все изменения цен успешно сохранены в облако!');
+    } else {
+      Alert.alert('Ошибка', 'Не удалось сохранить изменения в облако.');
+    }
+  };
+
+  // Удаление услуги
   const handleDeleteService = async (id) => {
     const updated = servicesList.filter(s => s.id !== id);
     setServicesList(updated);
@@ -63,6 +96,7 @@ export function SettingsTab({ servicesList = [], setServicesList, carClasses = [
     <ScrollView style={styles.container}>
       <Text style={styles.title}>Панель управления ценами</Text>
       
+      {/* Карточка добавления */}
       <View style={styles.card}>
         <Text style={styles.label}>Добавить новую услугу</Text>
         <TextInput
@@ -77,20 +111,58 @@ export function SettingsTab({ servicesList = [], setServicesList, carClasses = [
         </TouchableOpacity>
       </View>
 
-      <Text style={styles.subtitle}>Список услуг в базе:</Text>
+      {/* Заголовок списка и кнопка глобального сохранения */}
+      <View style={styles.headerRow}>
+        <Text style={styles.subtitle}>Редактирование цен (Матрица):</Text>
+        <TouchableOpacity style={styles.saveAllButton} onPress={handleSaveToCloud}>
+          <Text style={styles.saveAllButtonText}>💾 Сохранить цены</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Список услуг с матрицей цен */}
       {(servicesList || []).map((service, index) => {
         const sName = typeof service.name === 'string' ? service.name : (service.name?.name || 'Услуга');
         const sCat = typeof service.category === 'string' ? service.category : (service.category?.name || 'Категория');
         
         return (
-          <View key={service.id || index} style={styles.serviceItem}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.serviceName}>{sName}</Text>
-              <Text style={styles.serviceCat}>{sCat}</Text>
+          <View key={service.id || index} style={styles.serviceCard}>
+            <View style={styles.serviceHeader}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.serviceName}>{sName}</Text>
+                <Text style={styles.serviceCat}>{sCat}</Text>
+              </View>
+              <TouchableOpacity style={styles.deleteButton} onPress={() => handleDeleteService(service.id)}>
+                <Text style={styles.deleteButtonText}>Удалить</Text>
+              </TouchableOpacity>
             </View>
-            <TouchableOpacity style={styles.deleteButton} onPress={() => handleDeleteService(service.id)}>
-              <Text style={styles.deleteButtonText}>Удалить</Text>
-            </TouchableOpacity>
+
+            {/* Цикл по классам автомобилей */}
+            {(carClasses || []).map((carClass) => {
+              const classId = typeof carClass === 'object' ? (carClass.id || carClass.name) : carClass;
+              const className = typeof carClass === 'object' ? (carClass.name || carClass.id) : carClass;
+
+              return (
+                <View key={classId} style={styles.classRow}>
+                  <Text style={styles.className}>{className}</Text>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.radiiScroll}>
+                    {ALL_RADII.map((radius) => {
+                      const currentPrice = service.prices?.[classId]?.[radius] ?? '';
+                      return (
+                        <View key={radius} style={styles.priceCell}>
+                          <Text style={styles.radiusLabel}>{radius}</Text>
+                          <TextInput
+                            style={styles.priceInput}
+                            keyboardType="numeric"
+                            value={String(currentPrice)}
+                            onChangeText={(val) => handlePriceChange(service.id, classId, radius, val)}
+                          />
+                        </View>
+                      );
+                    })}
+                  </ScrollView>
+                </View>
+              );
+            })}
           </View>
         );
       })}
@@ -98,21 +170,30 @@ export function SettingsTab({ servicesList = [], setServicesList, carClasses = [
   );
 }
 
-// Двойной экспорт предотвращает ошибку #130 при любом типе импорта в родительском файле
 export default SettingsTab;
 
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 16, backgroundColor: '#f5f5f5' },
   title: { fontSize: 20, fontWeight: 'bold', marginBottom: 16, color: '#333' },
-  subtitle: { fontSize: 18, fontWeight: '600', marginBottom: 12, color: '#444', marginTop: 10 },
+  subtitle: { fontSize: 18, fontWeight: '600', color: '#444' },
+  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, marginTop: 10 },
   card: { backgroundColor: '#fff', padding: 16, borderRadius: 12, marginBottom: 16, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 4, elevation: 2 },
   label: { fontSize: 16, fontWeight: '600', marginBottom: 8, color: '#444' },
   input: { borderWidth: 1, borderColor: '#ddd', padding: 12, borderRadius: 8, marginBottom: 12, backgroundColor: '#fff', fontSize: 14 },
   button: { backgroundColor: '#007AFF', padding: 14, borderRadius: 8, alignItems: 'center' },
   buttonText: { color: '#fff', fontWeight: 'bold', fontSize: 15 },
-  serviceItem: { backgroundColor: '#fff', padding: 12, borderRadius: 8, marginBottom: 8, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', elevation: 1 },
-  serviceName: { fontSize: 16, fontWeight: '500', color: '#333' },
+  saveAllButton: { backgroundColor: '#34C759', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 6 },
+  saveAllButtonText: { color: '#fff', fontWeight: 'bold', fontSize: 13 },
+  serviceCard: { backgroundColor: '#fff', padding: 14, borderRadius: 10, marginBottom: 14, elevation: 2, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 3 },
+  serviceHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, borderBottomWidth: 1, borderBottomColor: '#eee', paddingBottom: 8 },
+  serviceName: { fontSize: 16, fontWeight: 'bold', color: '#333' },
   serviceCat: { fontSize: 12, color: '#888', marginTop: 2 },
-  deleteButton: { backgroundColor: '#ff3b30', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 6 },
-  deleteButtonText: { color: '#fff', fontSize: 12, fontWeight: 'bold' }
+  deleteButton: { backgroundColor: '#ff3b30', горизонтальный: 10, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6 },
+  deleteButtonText: { color: '#fff', fontSize: 11, fontWeight: 'bold' },
+  classRow: { marginBottom: 8, backgroundColor: '#fafafa', padding: 8, borderRadius: 6 },
+  className: { fontSize: 14, fontWeight: '600', color: '#555', marginBottom: 4 },
+  radiiScroll: { flexDirection: 'row' },
+  priceCell: { marginRight: 8, alignItems: 'center' },
+  radiusLabel: { fontSize: 11, color: '#666', marginBottom: 2 },
+  priceInput: { borderWidth: 1, borderColor: '#ccc', width: 50, height: 36, textAlign: 'center', borderRadius: 4, backgroundColor: '#fff', fontSize: 13 }
 });
