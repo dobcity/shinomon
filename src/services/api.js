@@ -30,7 +30,7 @@ export const fetchCloudServices = async () => {
 
     // 🔍 ТЕСТОВЫЙ ВЫВОД В КОНСОЛЬ
    // Замените console.log на alert:
-alert('Данные из облака: ' + JSON.stringify(data.record));
+
 
     console.log('Это массив?', Array.isArray(data.record));
 
