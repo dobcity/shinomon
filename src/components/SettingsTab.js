@@ -9,7 +9,8 @@ export function SettingsTab({
   setServicesList, 
   carClasses = [], 
   setCarClasses = () => {}, 
-  categories = ['Шиномонтаж', 'Ремонт'] 
+  categories = ['Шиномонтаж', 'Ремонт'],
+  onSaveServices // Добавили принятие пропса из App.js
 }) {
   const [newServiceName, setNewServiceName] = useState('');
   const [newCarClassName, setNewCarClassName] = useState('');
@@ -172,13 +173,17 @@ export function SettingsTab({
     setServicesList(updated);
   };
 
-  // Ручное сохранение всех изменений цен в облако
+  // Ручное сохранение всех изменений цен через функцию App.js (локально + облако)
   const handleSaveToCloud = async () => {
-    const success = await updateCloudServices(servicesList);
-    if (success) {
-      Alert.alert('Успех', 'Все изменения цен успешно сохранены в облако!');
+    if (onSaveServices) {
+      await onSaveServices(servicesList);
     } else {
-      Alert.alert('Ошибка', 'Не удалось сохранить изменения в облако.');
+      const success = await updateCloudServices(servicesList);
+      if (success) {
+        Alert.alert('Успех', 'Все изменения цен успешно сохранены в облако!');
+      } else {
+        Alert.alert('Ошибка', 'Не удалось сохранить изменения в облако.');
+      }
     }
   };
 
