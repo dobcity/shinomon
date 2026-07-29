@@ -50,25 +50,45 @@ export default function App() {
   const [carPhoto, setCarPhoto] = useState(null);
   const [selectedCategory, setSelectedCategory] = useState('Все');
 
-  // 1. Загрузка данных при старте
+  // 1. Загрузка данных при старте (Облако + Локально)
   const loadData = async () => {
     try {
-      // Загрузка классов авто
-      const storedClasses = await AsyncStorage.getItem(STORAGE_KEYS.CLASSES);
-      let loadedClasses = storedClasses ? JSON.parse(storedClasses) : DEFAULT_CLASSES;
-      setCarClasses(loadedClasses);
-      if (loadedClasses.length > 0) setSelectedClass(loadedClasses[0]);
+      console.log('🔄 Запрашиваем данные из облака...');
+      const cloudData = await fetchCloudServices(); // Получаем данные из jsonbin.io
 
-      // ☁️ Загрузка цен из облака
-      console.log('🔄 Запрашиваем услуги из облака...');
-      const cloudServices = await fetchCloudServices();
+      let loadedServices = [];
+      let loadedClasses = null;
 
-      if (cloudServices && Array.isArray(cloudServices) && cloudServices.length > 0) {
-        console.log('✅ Применены услуги из облака');
-        setServicesList(cloudServices);
-        await AsyncStorage.setItem(STORAGE_KEYS.SERVICES, JSON.stringify(cloudServices));
+      if (cloudData) {
+        if (!Array.isArray(cloudData) && cloudData.services) {
+          // Новый формат: объект с классами и услугами
+          loadedServices = cloudData.services;
+          loadedClasses = cloudData.carClasses;
+        } else if (Array.isArray(cloudData)) {
+          // Старый формат: только массив услуг
+          loadedServices = cloudData;
+        }
+      }
+
+      // 1. Обработка классов авто
+      if (loadedClasses && Array.isArray(loadedClasses) && loadedClasses.length > 0) {
+        setCarClasses(loadedClasses);
+        setSelectedClass(loadedClasses[0]);
+        await AsyncStorage.setItem(STORAGE_KEYS.CLASSES, JSON.stringify(loadedClasses));
+        console.log('✅ Классы авто загружены из облака');
       } else {
-        console.warn('⚠️ Облако недоступно, берем локальный кэш');
+        const storedClasses = await AsyncStorage.getItem(STORAGE_KEYS.CLASSES);
+        const fallbackClasses = storedClasses ? JSON.parse(storedClasses) : DEFAULT_CLASSES;
+        setCarClasses(fallbackClasses);
+        if (fallbackClasses.length > 0) setSelectedClass(fallbackClasses[0]);
+      }
+
+      // 2. Обработка услуг
+      if (loadedServices && loadedServices.length > 0) {
+        setServicesList(loadedServices);
+        await AsyncStorage.setItem(STORAGE_KEYS.SERVICES, JSON.stringify(loadedServices));
+        console.log('✅ Услуги загружены из облака');
+      } else {
         const storedServices = await AsyncStorage.getItem(STORAGE_KEYS.SERVICES);
         setServicesList(storedServices ? JSON.parse(storedServices) : DEFAULT_SERVICES);
       }
@@ -79,8 +99,17 @@ export default function App() {
 
     } catch (e) {
       console.error('Ошибка при загрузке данных:', e);
+      // Фолбэк на локальное хранилище при сбое сети
+      const storedClasses = await AsyncStorage.getItem(STORAGE_KEYS.CLASSES);
+      if (storedClasses) {
+        const parsed = JSON.parse(storedClasses);
+        setCarClasses(parsed);
+        if (parsed.length > 0) setSelectedClass(parsed[0]);
+      }
+      const storedServices = await AsyncStorage.getItem(STORAGE_KEYS.SERVICES);
+      if (storedServices) setServicesList(JSON.parse(storedServices));
     } finally {
-      setIsLoaded(true); // Закрываем экран загрузки
+      setIsLoaded(true);
     }
   };
 
@@ -93,8 +122,13 @@ export default function App() {
   const handleSaveServices = async (newServices) => {
     setServicesList(newServices);
     
-    // Отправляем в облако
-    const isSuccess = await updateCloudServices(newServices);
+    // Формируем общий пакет для облака (услуги + текущие классы)
+    const payload = {
+      services: newServices,
+      carClasses: carClasses
+    };
+
+    const isSuccess = await updateCloudServices(payload);
 
     if (isSuccess) {
       await AsyncStorage.setItem(STORAGE_KEYS.SERVICES, JSON.stringify(newServices));
@@ -104,11 +138,24 @@ export default function App() {
     }
   };
 
-  // 3. Сохранение классов автомобилей локально
+  // 3. Сохранение классов автомобилей (Локально + Облако)
   const handleSaveCarClasses = async (newClasses) => {
     setCarClasses(newClasses);
     try {
       await AsyncStorage.setItem(STORAGE_KEYS.CLASSES, JSON.stringify(newClasses));
+
+      // Отправляем в облако полный пакет (текущие услуги + новые классы)
+      const payload = {
+        services: servicesList,
+        carClasses: newClasses
+      };
+      
+      const isSuccess = await updateCloudServices(payload);
+      if (isSuccess) {
+        Alert.alert('Успех', 'Классы авто сохранены в облако!');
+      } else {
+        Alert.alert('Внимание', 'Сохранено локально, но не удалось отправить в облако.');
+      }
     } catch (e) {
       console.error('Ошибка сохранения классов в хранилище:', e);
     }
@@ -168,7 +215,8 @@ export default function App() {
 
     const orderServices = activeIds.map((id) => {
       const s = servicesList.find((item) => item.id === id);
-      const price = s?.prices?.[selectedClass.id]?.[selectedRadius] || 0;
+      const classKey = typeof selectedClass === 'object' ? (selectedClass.id || selectedClass.name) : selectedClass;
+      const price = s?.prices?.[classKey]?.[selectedRadius] || 0;
       const qty = selectedServices[id];
       return {
         id,
@@ -182,7 +230,7 @@ export default function App() {
     const newOrder = {
       id: Date.now().toString(),
       date: new Date().toLocaleString('ru-RU'),
-      className: selectedClass.name,
+      className: typeof selectedClass === 'object' ? (selectedClass.name || selectedClass.id) : selectedClass,
       radius: selectedRadius,
       carNote,
       carPhoto: permanentPhotoPath,
