@@ -28,8 +28,17 @@ import { SettingsTab } from './src/components/SettingsTab';
 
 const ADMIN_PIN = '7777';
 
+// Безопасная проверка админа для мобильных устройств
+const checkAdminSafe = () => {
+  try {
+    return getIsAdmin();
+  } catch (e) {
+    return false;
+  }
+};
+
 export default function App() {
-  const vkDetectedAdmin = getIsAdmin();
+  const vkDetectedAdmin = checkAdminSafe();
   const [adminOverride, setAdminOverride] = useState(false);
   const [tapCount, setTapCount] = useState(0);
 
@@ -49,6 +58,13 @@ export default function App() {
   const [carNote, setCarNote] = useState('');
   const [carPhoto, setCarPhoto] = useState(null);
   const [selectedCategory, setSelectedCategory] = useState('Все');
+
+  // Если админ-режим выключается, принудительно возвращаем вкладку на "Расчет"
+  useEffect(() => {
+    if (!isAdmin && activeTab !== 'calc') {
+      setActiveTab('calc');
+    }
+  }, [isAdmin]);
 
   // 1. Загрузка данных (Local-First: сначала из памяти для мгновенного запуска)
   const loadData = async () => {
@@ -155,7 +171,6 @@ export default function App() {
 
       if (adminOverride) {
         setAdminOverride(false);
-        setActiveTab('calc'); // Возвращаем на вкладку расчёта при выходе
         Alert.alert('Выход', 'Режим администратора отключен.');
         return;
       }
@@ -254,7 +269,7 @@ export default function App() {
         <Text style={styles.headerTitle}>🛞 Шиномонтаж Pro</Text>
       </TouchableOpacity>
 
-      {/* Панель вкладок: История и Настройки скрыты, пока не введен ПИН-код */}
+      {/* Панель вкладок без фрагментов для стабильности на мобильных */}
       <View style={styles.tabBar}>
         <TouchableOpacity
           style={[styles.tabButton, activeTab === 'calc' && styles.tabButtonActive]}
@@ -265,23 +280,23 @@ export default function App() {
         </TouchableOpacity>
         
         {isAdmin && (
-          <>
-            <TouchableOpacity
-              style={[styles.tabButton, activeTab === 'history' && styles.tabButtonActive]}
-              onPress={() => setActiveTab('history')}>
-              <Text style={[styles.tabText, activeTab === 'history' && styles.tabTextActive]}>
-                📜 История ({savedOrders.length})
-              </Text>
-            </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.tabButton, activeTab === 'history' && styles.tabButtonActive]}
+            onPress={() => setActiveTab('history')}>
+            <Text style={[styles.tabText, activeTab === 'history' && styles.tabTextActive]}>
+              📜 История ({savedOrders.length})
+            </Text>
+          </TouchableOpacity>
+        )}
 
-            <TouchableOpacity
-              style={[styles.tabButton, activeTab === 'settings' && styles.tabButtonActive]}
-              onPress={() => setActiveTab('settings')}>
-              <Text style={[styles.tabText, activeTab === 'settings' && styles.tabTextActive]}>
-                ⚙️ Настройки
-              </Text>
-            </TouchableOpacity>
-          </>
+        {isAdmin && (
+          <TouchableOpacity
+            style={[styles.tabButton, activeTab === 'settings' && styles.tabButtonActive]}
+            onPress={() => setActiveTab('settings')}>
+            <Text style={[styles.tabText, activeTab === 'settings' && styles.tabTextActive]}>
+              ⚙️ Настройки
+            </Text>
+          </TouchableOpacity>
         )}
       </View>
 
