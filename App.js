@@ -1,13 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import bridge from '@vkontakte/vk-bridge';
 
-export default function App() {
-  useEffect(() => {
-    bridge.send('VKWebAppInit');
-  }, []);
 
 
-  // ... далее весь ваш существующий код калькулятора ...
 
 import {
   StyleSheet,
@@ -27,7 +22,10 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
-
+export default function App() {
+  useEffect(() => {
+    bridge.send('VKWebAppInit');
+  }, []);
 const RADIUS_OPTIONS = [
   'R13',
   'R14',
