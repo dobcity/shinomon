@@ -4,7 +4,7 @@ import { updateCloudServices } from '../services/api';
 
 const ALL_RADII = ['R13', 'R14', 'R15', 'R16', 'R17', 'R18', 'R19', 'R20', 'R21', 'R22'];
 
-export default function SettingsTab({ servicesList = [], setServicesList, carClasses = [], categories = ['Шиномонтаж', 'Ремонт'] }) {
+export function SettingsTab({ servicesList = [], setServicesList, carClasses = [], categories = ['Шиномонтаж', 'Ремонт'] }) {
   const [newServiceName, setNewServiceName] = useState('');
   const [selectedCategory, setSelectedCategory] = useState(categories[0] || 'Шиномонтаж');
 
@@ -97,6 +97,9 @@ export default function SettingsTab({ servicesList = [], setServicesList, carCla
     </ScrollView>
   );
 }
+
+// Двойной экспорт предотвращает ошибку #130 при любом типе импорта в родительском файле
+export default SettingsTab;
 
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 16, backgroundColor: '#f5f5f5' },
