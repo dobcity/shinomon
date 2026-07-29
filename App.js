@@ -28,6 +28,57 @@ import { HistoryTab } from './src/components/HistoryTab';
 import { SettingsTab } from './src/components/SettingsTab';
 
 const ADMIN_PIN = '7777';
+// Загрузка данных при запуске приложения
+const loadData = async () => {
+  try {
+    // 1. Пытаемся получить свежие цены из облака
+    const cloudServices = await fetchCloudServices();
+
+    if (cloudServices && Array.isArray(cloudServices)) {
+      setServicesList(cloudServices);
+      // Кэшируем локально на случай отсутствия интернета у клиента
+      await AsyncStorage.setItem(STORAGE_KEYS.SERVICES, JSON.stringify(cloudServices));
+    } else {
+      // Если интернет отсутствует или ошибка в API — берем из памяти устройства или по умолчанию
+      const storedServices = await AsyncStorage.getItem(STORAGE_KEYS.SERVICES);
+      if (storedServices) {
+        setServicesList(JSON.parse(storedServices));
+      }
+    }
+
+    // Загрузка классов и сохраненных заказов
+    const storedClasses = await AsyncStorage.getItem(STORAGE_KEYS.CLASSES);
+    const storedOrders = await AsyncStorage.getItem(STORAGE_KEYS.ORDERS);
+
+    let loadedClasses = storedClasses ? JSON.parse(storedClasses) : DEFAULT_CLASSES;
+    setCarClasses(loadedClasses);
+    if (loadedClasses.length > 0) setSelectedClass(loadedClasses[0]);
+
+    if (storedOrders) setSavedOrders(JSON.parse(storedOrders));
+  } catch (e) {
+    console.error('Ошибка при инициализации данных:', e);
+  } finally {
+    setIsLoaded(true);
+  }
+};
+
+// Сохранение цен администратором из вкладки «Настройки»
+const handleSaveServices = async (newServices) => {
+  // 1. Обновляем экран администратора
+  setServicesList(newServices);
+  
+  // 2. Отправляем изменения в облако для ВСЕХ пользователей
+  const isSuccess = await updateCloudServices(newServices);
+
+  if (isSuccess) {
+    // Сохраняем локальный кэш
+    await AsyncStorage.setItem(STORAGE_KEYS.SERVICES, JSON.stringify(newServices));
+    Alert.alert('Успех', 'Новые цены сохранены в облаке и обновлены у всех клиентов!');
+  } else {
+    Alert.alert('Ошибка', 'Не удалось отправить данные в облако. Проверьте подключение к интернету.');
+  }
+};
+
 
 export default function App() {
   const vkDetectedAdmin = getIsAdmin();
