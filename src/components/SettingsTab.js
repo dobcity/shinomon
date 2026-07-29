@@ -1,61 +1,76 @@
-const BIN_ID = '6a696f58da38895dfe9e2a0b';
-const API_KEY = '$2a$10$Q3PRvPm1RQEjwm7ll5VaPuDucTURtRSL23ltthf/WetwodziJe6um';
+import React, { useState } from 'react';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert } from 'react-native';
+import { updateCloudServices } from '../services/api';
 
-const BASE_URL = `https://api.jsonbin.io/v3/b/${BIN_ID}`;
+const ALL_RADII = ['R13', 'R14', 'R15', 'R16', 'R17', 'R18', 'R19', 'R20', 'R21', 'R22'];
 
-export const fetchCloudServices = async () => {
-  try {
-    const response = await fetch(`${BASE_URL}/latest`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Master-Key': API_KEY,
-      },
+export default function SettingsTab({ servicesList, setServicesList, carClasses, categories = ['Шиномонтаж', 'Ремонт'] }) {
+  const [newServiceName, setNewServiceName] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState(categories[0] || 'Шиномонтаж');
+
+  const handleAddService = async () => {
+    const trimmedName = newServiceName.trim();
+    if (!trimmedName) {
+      Alert.alert('Ошибка', 'Введите название услуги');
+      return;
+    }
+
+    const emptyPrices = {};
+    (carClasses || []).forEach((cls) => {
+      emptyPrices[cls.id] = {};
+      ALL_RADII.forEach((r) => {
+        emptyPrices[cls.id][r] = 0;
+      });
     });
 
-    if (!response.ok) {
-      console.error(`[API GET Error] Статус: ${response.status}`);
-      return null;
-    }
+    const newService = {
+      id: Date.now().toString(),
+      category: selectedCategory,
+      name: trimmedName,
+      prices: emptyPrices,
+    };
 
-    const data = await response.json();
+    const updated = [...(servicesList || []), newService];
+    setServicesList(updated);
     
-    // JSONBin возвращает объект { record: [...], metadata: {...} }
-    // Если record существует — возвращаем его, иначе пробовали распарсить напрямую
-    if (data && data.record) {
-      return data.record;
-    }
-    
-    return Array.isArray(data) ? data : null;
-  } catch (error) {
-    console.error('[API GET Catch]', error);
-    return null;
-  }
-};
-
-export const updateCloudServices = async (newServicesList) => {
-  try {
-    // Защита от передачи невалидных данных (например undefined)
-    const cleanData = JSON.parse(JSON.stringify(newServicesList || []));
-
-    const response = await fetch(BASE_URL, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Master-Key': API_KEY,
-      },
-      body: JSON.stringify(cleanData),
-    });
-
-    if (!response.ok) {
-      const errText = await response.text();
-      console.error(` Ошибка сохранения в облако (${response.status}): ${errText}`);
-      return false;
+    // Синхронизация с облаком JSONBin
+    const success = await updateCloudServices(updated);
+    if (success) {
+      Alert.alert('Успех', `Услуга "${trimmedName}" добавлена и сохранена в облако!`);
+    } else {
+      Alert.alert('Внимание', 'Услуга добавлена локально, но не удалось сохранить в облако.');
     }
 
-    return true;
-  } catch (error) {
-    console.error('Сетевая ошибка при отправке в облако:', error);
-    return false;
-  }
-};
+    setNewServiceName('');
+  };
+
+  return (
+    <ScrollView style={styles.container}>
+      <Text style={styles.title}>Панель управления ценами</Text>
+      
+      <View style={styles.card}>
+        <Text style={styles.label}>Добавить новую услугу</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Название услуги (например: Правка диска)"
+          placeholderTextColor="#999"
+          value={newServiceName}
+          onChangeText={setNewServiceName}
+        />
+        <TouchableOpacity style={styles.button} onPress={handleAddService}>
+          <Text style={styles.buttonText}>Добавить услугу</Text>
+        </TouchableOpacity>
+      </View>
+    </ScrollView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1, padding: 16, backgroundColor: '#f5f5f5' },
+  title: { fontSize: 20, fontWeight: 'bold', marginBottom: 16, color: '#333' },
+  card: { backgroundColor: '#fff', padding: 16, borderRadius: 12, marginBottom: 16, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 4, elevation: 2 },
+  label: { fontSize: 16, fontWeight: '600', marginBottom: 8, color: '#444' },
+  input: { borderWidth: 1, borderColor: '#ddd', padding: 12, borderRadius: 8, marginBottom: 12, backgroundColor: '#fff', fontSize: 14 },
+  button: { backgroundColor: '#007AFF', padding: 14, borderRadius: 8, alignItems: 'center' },
+  buttonText: { color: '#fff', fontWeight: 'bold', fontSize: 15 },
+});
