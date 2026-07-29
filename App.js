@@ -93,6 +93,21 @@ export default function App() {
         await AsyncStorage.setItem(STORAGE_KEYS.CLASSES, JSON.stringify(DEFAULT_CLASSES));
       }
 
+      // Проверка локальных категорий услуг
+      const storedCategories = await AsyncStorage.getItem(STORAGE_KEYS.CATEGORIES);
+      if (storedCategories) {
+        const parsed = JSON.parse(storedCategories);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setServiceCategories(parsed);
+        } else {
+          setServiceCategories(DEFAULT_CATEGORIES);
+          await AsyncStorage.setItem(STORAGE_KEYS.CATEGORIES, JSON.stringify(DEFAULT_CATEGORIES));
+        }
+      } else {
+        setServiceCategories(DEFAULT_CATEGORIES);
+        await AsyncStorage.setItem(STORAGE_KEYS.CATEGORIES, JSON.stringify(DEFAULT_CATEGORIES));
+      }
+
       // Проверка истории заказов
       const storedOrders = await AsyncStorage.getItem(STORAGE_KEYS.ORDERS);
       if (storedOrders) {
@@ -102,6 +117,7 @@ export default function App() {
       console.error('Ошибка при локальной загрузке:', e);
       setServicesList(DEFAULT_SERVICES);
       setCarClasses(DEFAULT_CLASSES);
+      setServiceCategories(DEFAULT_CATEGORIES);
       if (DEFAULT_CLASSES.length > 0) setSelectedClass(DEFAULT_CLASSES[0]);
     } finally {
       setIsLoaded(true);
@@ -119,6 +135,10 @@ export default function App() {
           setCarClasses(cloudData.carClasses);
           setSelectedClass(cloudData.carClasses[0]);
           await AsyncStorage.setItem(STORAGE_KEYS.CLASSES, JSON.stringify(cloudData.carClasses));
+        }
+        if (cloudData.categories && Array.isArray(cloudData.categories) && cloudData.categories.length > 0) {
+          setServiceCategories(cloudData.categories);
+          await AsyncStorage.setItem(STORAGE_KEYS.CATEGORIES, JSON.stringify(cloudData.categories));
         }
       }
     } catch (e) {
@@ -138,7 +158,8 @@ export default function App() {
     
     const payload = {
       services: newServices,
-      carClasses: carClasses
+      carClasses: carClasses,
+      categories: serviceCategories,
     };
 
     const isSuccess = await updateCloudServices(payload);
@@ -158,7 +179,8 @@ export default function App() {
 
       const payload = {
         services: servicesList,
-        carClasses: newClasses
+        carClasses: newClasses,
+        categories: serviceCategories,
       };
       
       const isSuccess = await updateCloudServices(payload);
@@ -172,7 +194,30 @@ export default function App() {
     }
   };
 
-  // 4. Секретный вход/выход для админа (5 тапов на шапку)
+  // 4. Сохранение категорий услуг
+  const handleSaveCategories = async (newCategories) => {
+    setServiceCategories(newCategories);
+    try {
+      await AsyncStorage.setItem(STORAGE_KEYS.CATEGORIES, JSON.stringify(newCategories));
+
+      const payload = {
+        services: servicesList,
+        carClasses: carClasses,
+        categories: newCategories,
+      };
+      
+      const isSuccess = await updateCloudServices(payload);
+      if (isSuccess) {
+        Alert.alert('Успех', 'Категории сохранены локально и в облако VK!');
+      } else {
+        Alert.alert('Сохранено', 'Категории сохранены на устройстве (облако VK было недоступно).');
+      }
+    } catch (e) {
+      console.error('Ошибка сохранения категорий:', e);
+    }
+  };
+
+  // 5. Секретный вход/выход для админа (5 тапов на шапку)
   const handleHeaderTap = () => {
     const nextTap = tapCount + 1;
     setTapCount(nextTap);
@@ -213,7 +258,7 @@ export default function App() {
     }
   };
 
-  // 5. Оформление заказа
+  // 6. Оформление заказа
   const handleCreateOrder = async (computedTotal) => {
     if (!selectedClass) return;
     const activeIds = Object.keys(selectedServices).filter((id) => selectedServices[id] > 0);
@@ -343,6 +388,8 @@ export default function App() {
           carClasses={carClasses}
           setCarClasses={handleSaveCarClasses}
           onSaveServices={handleSaveServices}
+          serviceCategories={serviceCategories}
+          setServiceCategories={handleSaveCategories}
         />
       )}
     </SafeAreaView>
