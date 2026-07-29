@@ -381,7 +381,7 @@ export default function App() {
         <HistoryTab savedOrders={savedOrders} onClearHistory={handleClearHistory} />
       )}
 
-      {activeTab === 'settings' && isAdmin && (
+           {activeTab === 'settings' && isAdmin && (
         <SettingsTab
           servicesList={servicesList}
           setServicesList={setServicesList}
@@ -392,7 +392,9 @@ export default function App() {
           setCategories={handleSaveCategories}   // ✅ Передаем функцию сохранения категорий
         />
       )}
-
+    </SafeAreaView>
+  );
+}
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f4f6f8' },
