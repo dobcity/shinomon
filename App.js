@@ -28,21 +28,12 @@ import { SettingsTab } from './src/components/SettingsTab';
 
 const ADMIN_PIN = '7777';
 
-// Безопасная проверка админа для мобильных устройств
-const checkAdminSafe = () => {
-  try {
-    return getIsAdmin();
-  } catch (e) {
-    return false;
-  }
-};
-
 export default function App() {
-  const vkDetectedAdmin = checkAdminSafe();
+  // Вкладки скрыты по умолчанию, пока владелец не введет ПИН-код через 5 нажатий
   const [adminOverride, setAdminOverride] = useState(false);
   const [tapCount, setTapCount] = useState(0);
 
-  const isAdmin = vkDetectedAdmin || adminOverride;
+  const isAdmin = adminOverride;
 
   const [activeTab, setActiveTab] = useState('calc');
   const [isLoaded, setIsLoaded] = useState(false);
@@ -52,7 +43,7 @@ export default function App() {
   const [servicesList, setServicesList] = useState(DEFAULT_SERVICES);
   const [savedOrders, setSavedOrders] = useState([]);
 
-  const [selectedClass, setSelectedClass] = useState(null);
+  const [selectedClass, setSelectedClass] = useState(DEFAULT_CLASSES[0] || null);
   const [selectedRadius, setSelectedRadius] = useState('R16');
   const [selectedServices, setSelectedServices] = useState({});
   const [carNote, setCarNote] = useState('');
@@ -66,37 +57,57 @@ export default function App() {
     }
   }, [isAdmin]);
 
-  // 1. Загрузка данных (Local-First: сначала из памяти для мгновенного запуска)
+  // 1. Загрузка данных (Local-First с надежным Fallback на дефолтные значения)
   const loadData = async () => {
     try {
+      // Проверка локальных услуг
       const storedServices = await AsyncStorage.getItem(STORAGE_KEYS.SERVICES);
       if (storedServices) {
-        setServicesList(JSON.parse(storedServices));
+        const parsed = JSON.parse(storedServices);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setServicesList(parsed);
+        } else {
+          setServicesList(DEFAULT_SERVICES);
+          await AsyncStorage.setItem(STORAGE_KEYS.SERVICES, JSON.stringify(DEFAULT_SERVICES));
+        }
       } else {
         setServicesList(DEFAULT_SERVICES);
+        await AsyncStorage.setItem(STORAGE_KEYS.SERVICES, JSON.stringify(DEFAULT_SERVICES));
       }
 
+      // Проверка локальных классов авто
       const storedClasses = await AsyncStorage.getItem(STORAGE_KEYS.CLASSES);
       if (storedClasses) {
         const parsed = JSON.parse(storedClasses);
-        setCarClasses(parsed);
-        if (parsed.length > 0) setSelectedClass(parsed[0]);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setCarClasses(parsed);
+          setSelectedClass(parsed[0]);
+        } else {
+          setCarClasses(DEFAULT_CLASSES);
+          if (DEFAULT_CLASSES.length > 0) setSelectedClass(DEFAULT_CLASSES[0]);
+          await AsyncStorage.setItem(STORAGE_KEYS.CLASSES, JSON.stringify(DEFAULT_CLASSES));
+        }
       } else {
         setCarClasses(DEFAULT_CLASSES);
         if (DEFAULT_CLASSES.length > 0) setSelectedClass(DEFAULT_CLASSES[0]);
+        await AsyncStorage.setItem(STORAGE_KEYS.CLASSES, JSON.stringify(DEFAULT_CLASSES));
       }
 
+      // Проверка истории заказов
       const storedOrders = await AsyncStorage.getItem(STORAGE_KEYS.ORDERS);
       if (storedOrders) {
         setSavedOrders(JSON.parse(storedOrders));
       }
     } catch (e) {
       console.error('Ошибка при локальной загрузке:', e);
+      setServicesList(DEFAULT_SERVICES);
+      setCarClasses(DEFAULT_CLASSES);
+      if (DEFAULT_CLASSES.length > 0) setSelectedClass(DEFAULT_CLASSES[0]);
     } finally {
       setIsLoaded(true);
     }
 
-    // Фоновая синхронизация с облаком VK
+    // Фоновая синхронизация с облаком VK (если там есть данные)
     try {
       const cloudData = await fetchCloudServices();
       if (cloudData) {
@@ -161,7 +172,7 @@ export default function App() {
     }
   };
 
-  // 4. Секретный вход/выход для админа
+  // 4. Секретный вход/выход для админа (5 тапов на шапку)
   const handleHeaderTap = () => {
     const nextTap = tapCount + 1;
     setTapCount(nextTap);
@@ -269,7 +280,7 @@ export default function App() {
         <Text style={styles.headerTitle}>🛞 Шиномонтаж Pro</Text>
       </TouchableOpacity>
 
-      {/* Панель вкладок без фрагментов для стабильности на мобильных */}
+      {/* Панель вкладок (показывается только после ввода ПИН-кода администратора) */}
       <View style={styles.tabBar}>
         <TouchableOpacity
           style={[styles.tabButton, activeTab === 'calc' && styles.tabButtonActive]}
