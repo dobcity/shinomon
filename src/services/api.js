@@ -14,12 +14,13 @@ const withTimeout = (promise, ms = 3000) => {
   return Promise.race([promise, timeoutPromise]).finally(() => clearTimeout(timeoutId));
 };
 
-// Загрузка данных из облака VK с защитой от зависания
+// Загрузка данных из общего облака группы VK с защитой от зависания
 export const fetchCloudServices = async () => {
   try {
     const data = await withTimeout(
       bridge.send('VKWebAppStorageGet', {
         keys: [VK_KEYS.SERVICES, VK_KEYS.CLASSES],
+        shared: true, // Общее хранилище сообщества для всех сотрудников
       }),
       3000
     );
@@ -53,7 +54,7 @@ export const fetchCloudServices = async () => {
   }
 };
 
-// Сохранение данных в облако VK с защитой от зависания
+// Сохранение данных в общее облако группы VK с защитой от зависания
 export const updateCloudServices = async (payload) => {
   try {
     const requests = [];
@@ -64,6 +65,7 @@ export const updateCloudServices = async (payload) => {
           bridge.send('VKWebAppStorageSet', {
             key: VK_KEYS.SERVICES,
             value: JSON.stringify(payload.services),
+            shared: true, // Общее хранилище сообщества
           }),
           3000
         )
@@ -76,6 +78,7 @@ export const updateCloudServices = async (payload) => {
           bridge.send('VKWebAppStorageSet', {
             key: VK_KEYS.CLASSES,
             value: JSON.stringify(payload.carClasses),
+            shared: true, // Общее хранилище сообщества
           }),
           3000
         )
