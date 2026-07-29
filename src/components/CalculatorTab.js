@@ -94,7 +94,10 @@ export const CalculatorTab = ({
                 triggerHaptic();
                 setSelectedClass(c);
               }}>
-              <Text style={[styles.classCardTitle, selectedClass?.id === c.id && styles.classCardTitleSelected]}>
+              <Text 
+                style={[styles.classCardTitle, selectedClass?.id === c.id && styles.classCardTitleSelected]}
+                numberOfLines={1}
+                ellipsizeMode="tail">
                 {c.name}
               </Text>
             </TouchableOpacity>
@@ -195,11 +198,16 @@ export const CalculatorTab = ({
 
 const styles = StyleSheet.create({
   sectionTitle: { fontSize: 14, fontWeight: '700', color: '#212529', marginTop: 12, marginBottom: 8 },
-  classRow: { flexDirection: 'row', marginBottom: 8 },
-  classCard: { flex: 1, backgroundColor: '#fff', borderRadius: 8, padding: 10, marginHorizontal: 2, borderWidth: 1, borderColor: '#ced4da', alignItems: 'center' },
+  
+  // Изменено: добавлено flexWrap для переноса строк и небольшой gap вместо фиксированных отступов
+  classRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 8 },
+  
+  // Изменено: убран flex: 1, добавлены фиксированные отступы по бокам, чтобы кнопка сама адаптировалась под текст
+  classCard: { backgroundColor: '#fff', borderRadius: 8, paddingVertical: 8, paddingHorizontal: 12, borderWidth: 1, borderColor: '#ced4da', alignItems: 'center' },
   classCardSelected: { borderColor: '#0d6efd', backgroundColor: '#e7f1ff' },
   classCardTitle: { fontSize: 12, fontWeight: '600', color: '#333' },
   classCardTitleSelected: { color: '#0d6efd' },
+  
   rowMargin: { marginBottom: 12 },
   radiusChip: { backgroundColor: '#fff', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: '#ced4da', marginRight: 8 },
   radiusChipSelected: { backgroundColor: '#0d6efd', borderColor: '#0d6efd' },
