@@ -20,9 +20,11 @@ import {
 } from './src/constants';
 import { getIsAdmin } from './src/utils/vk';
 import { savePhotoPermanently } from './src/utils/storage';
-import { CalculatorTab } from './src/components/CalculatorTab';
 
-// 🔑 ВАШ СЕКРЕТНЫЙ ПИН-КОД ДЛЯ ВХОДА (Можете изменить на свой)
+import { CalculatorTab } from './src/components/CalculatorTab';
+import { HistoryTab } from './src/components/HistoryTab';
+import { SettingsTab } from './src/components/SettingsTab';
+
 const ADMIN_PIN = '7777';
 
 export default function App() {
@@ -30,7 +32,6 @@ export default function App() {
   const [adminOverride, setAdminOverride] = useState(false);
   const [tapCount, setTapCount] = useState(0);
 
-  // Права админа есть, если их подставил ВК ИЛИ введен правильный ПИН-код
   const isAdmin = vkDetectedAdmin || adminOverride;
 
   const [activeTab, setActiveTab] = useState('calc');
@@ -72,7 +73,6 @@ export default function App() {
     }
   };
 
-  // 5 быстро кликов + ввод ПИН-кода для администратора
   const handleHeaderTap = () => {
     const nextTap = tapCount + 1;
     setTapCount(nextTap);
@@ -86,7 +86,6 @@ export default function App() {
         return;
       }
 
-      // Запрос пароля
       if (Platform.OS === 'web') {
         const pin = window.prompt('Введите ПИН-код администратора:');
         if (pin === ADMIN_PIN) {
@@ -96,7 +95,6 @@ export default function App() {
           Alert.alert('Ошибка', 'Неверный ПИН-код!');
         }
       } else {
-        // Для iOS / Android
         Alert.prompt('Вход для владельца', 'Введите ПИН-код:', [
           { text: 'Отмена', style: 'cancel' },
           {
@@ -159,6 +157,15 @@ export default function App() {
     setCarPhoto(null);
   };
 
+  const handleClearHistory = async () => {
+    setSavedOrders([]);
+    await AsyncStorage.removeItem(STORAGE_KEYS.ORDERS);
+  };
+
+  const handleSaveServices = async (newServices) => {
+    await AsyncStorage.setItem(STORAGE_KEYS.SERVICES, JSON.stringify(newServices));
+  };
+
   if (!isLoaded) {
     return (
       <SafeAreaView style={styles.center}>
@@ -175,7 +182,6 @@ export default function App() {
         <Text style={styles.headerTitle}>🛞 Шиномонтаж Pro</Text>
       </TouchableOpacity>
 
-      {/* Вкладки видны ТОЛЬКО если вы админ в ВК или ввели ПИН-код */}
       {isAdmin && (
         <View style={styles.tabBar}>
           <TouchableOpacity
@@ -202,6 +208,7 @@ export default function App() {
         </View>
       )}
 
+      {/* Переключение вкладок */}
       {(activeTab === 'calc' || !isAdmin) && (
         <CalculatorTab
           carClasses={carClasses}
@@ -220,6 +227,19 @@ export default function App() {
           carPhoto={carPhoto}
           setCarPhoto={setCarPhoto}
           onCreateOrder={handleCreateOrder}
+        />
+      )}
+
+      {activeTab === 'history' && isAdmin && (
+        <HistoryTab savedOrders={savedOrders} onClearHistory={handleClearHistory} />
+      )}
+
+      {activeTab === 'settings' && isAdmin && (
+        <SettingsTab
+          servicesList={servicesList}
+          setServicesList={setServicesList}
+          carClasses={carClasses}
+          onSaveServices={handleSaveServices}
         />
       )}
     </SafeAreaView>
