@@ -1,16 +1,35 @@
 import React, { useState, useEffect } from 'react';
 import bridge from '@vkontakte/vk-bridge';
-import { SafeAreaView, StatusBar, Alert, View, StyleSheet, Text } from 'react-native';
+import {
+  SafeAreaView,
+  StatusBar,
+  Alert,
+  View,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+} from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import { DEFAULT_CLASSES, DEFAULT_CATEGORIES, DEFAULT_SERVICES, STORAGE_KEYS } from './src/constants';
+import {
+  DEFAULT_CLASSES,
+  DEFAULT_CATEGORIES,
+  DEFAULT_SERVICES,
+  STORAGE_KEYS,
+} from './src/constants';
 import { getIsAdmin } from './src/utils/vk';
 import { savePhotoPermanently } from './src/utils/storage';
 import { CalculatorTab } from './src/components/CalculatorTab';
 
 export default function App() {
-  const isAdmin = getIsAdmin();
-  const [activeTab, setActiveTab] = useState('calc');
+  const vkDetectedAdmin = getIsAdmin();
+  const [adminOverride, setAdminOverride] = useState(false);
+  const [tapCount, setTapCount] = useState(0);
+
+  // Итоговый флаг: если ВК подтвердил админа ИЛИ включен секретный режим
+  const isAdmin = vkDetectedAdmin || adminOverride;
+
+  const [activeTab, setActiveTab] = useState('calc'); // 'calc' | 'history' | 'settings'
   const [isLoaded, setIsLoaded] = useState(false);
 
   const [carClasses, setCarClasses] = useState(DEFAULT_CLASSES);
@@ -49,6 +68,23 @@ export default function App() {
     }
   };
 
+  // 5 быстрых кликов на шапку переключают режим Администратора
+  const handleHeaderTap = () => {
+    const nextTap = tapCount + 1;
+    setTapCount(nextTap);
+    if (nextTap >= 5) {
+      const nextState = !adminOverride;
+      setAdminOverride(nextState);
+      setTapCount(0);
+      Alert.alert(
+        'Режим администратора',
+        nextState
+          ? '🔓 Панель администратора принудительно ВКЛЮЧЕНА'
+          : '🔒 Панель администратора ВЫКЛЮЧЕНА'
+      );
+    }
+  };
+
   const handleCreateOrder = async (computedTotal) => {
     if (!selectedClass) return;
     const activeIds = Object.keys(selectedServices).filter((id) => selectedServices[id] > 0);
@@ -57,7 +93,6 @@ export default function App() {
       return;
     }
 
-    // Сохранение фото во внутреннее хранилище устройства
     const permanentPhotoPath = await savePhotoPermanently(carPhoto);
 
     const orderServices = activeIds.map((id) => {
@@ -105,9 +140,41 @@ export default function App() {
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" />
-      <View style={styles.header}>
+      
+      {/* Кликабельная шапка для секретного вызова меню */}
+      <TouchableOpacity activeOpacity={0.8} onPress={handleHeaderTap} style={styles.header}>
         <Text style={styles.headerTitle}>🛞 Шиномонтаж Pro</Text>
-      </View>
+        <Text style={styles.headerSubtitle}>
+          {isAdmin ? 'Режим: Администратор' : 'Режим: Клиент'}
+        </Text>
+      </TouchableOpacity>
+
+      {/* Панель навигации для администраторов */}
+      {isAdmin && (
+        <View style={styles.tabBar}>
+          <TouchableOpacity
+            style={[styles.tabButton, activeTab === 'calc' && styles.tabButtonActive]}
+            onPress={() => setActiveTab('calc')}>
+            <Text style={[styles.tabText, activeTab === 'calc' && styles.tabTextActive]}>
+              🧮 Расчёт
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.tabButton, activeTab === 'history' && styles.tabButtonActive]}
+            onPress={() => setActiveTab('history')}>
+            <Text style={[styles.tabText, activeTab === 'history' && styles.tabTextActive]}>
+              📜 История ({savedOrders.length})
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.tabButton, activeTab === 'settings' && styles.tabButtonActive]}
+            onPress={() => setActiveTab('settings')}>
+            <Text style={[styles.tabText, activeTab === 'settings' && styles.tabTextActive]}>
+              ⚙️ Настройки
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       {(activeTab === 'calc' || !isAdmin) && (
         <CalculatorTab
@@ -136,6 +203,12 @@ export default function App() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f4f6f8' },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  header: { padding: 16, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#e9ecef' },
+  header: { padding: 14, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#e9ecef' },
   headerTitle: { fontSize: 20, fontWeight: 'bold' },
+  headerSubtitle: { fontSize: 11, color: '#6c757d', marginTop: 2 },
+  tabBar: { flexDirection: 'row', backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#dee2e6' },
+  tabButton: { flex: 1, paddingVertical: 12, alignItems: 'center' },
+  tabButtonActive: { borderBottomWidth: 3, borderBottomColor: '#0d6efd' },
+  tabText: { fontSize: 13, fontWeight: '600', color: '#6c757d' },
+  tabTextActive: { color: '#0d6efd' },
 });
