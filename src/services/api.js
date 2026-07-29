@@ -1,13 +1,14 @@
 // Замените на ваши реальные значения из JSONBin.io
+
+// ⚠️ УБЕДИТЕСЬ, ЧТО ЗДЕСЬ ВСТАВЛЕНЫ НАСТОЯЩИЕ ЗНАЧЕНИЯ БЕЗ СКОБОК И ПРОБЕЛОВ!
 const BIN_ID = '6a6964f0da38895dfe9e0f3a';
 const API_KEY = '$2a$10$Q3PRvPm1RQEjwm7ll5VaPuDucTURtRSL23ltthf/WetwodziJe6um'; 
 
 const BASE_URL = `https://api.jsonbin.io/v3/b/${BIN_ID}`;
 
-// Загрузка актуального прайс-листа из облака
 export const fetchCloudServices = async () => {
   try {
-    const response = await fetch(BASE_URL, {
+    const response = await fetch(`${BASE_URL}/latest`, {
       method: 'GET',
       headers: {
         'X-Master-Key': API_KEY,
@@ -15,19 +16,18 @@ export const fetchCloudServices = async () => {
     });
 
     if (!response.ok) {
-      throw new Error(`Ошибка сервера: ${response.status}`);
+      console.error(`[API GET Error] Статус: ${response.status}`);
+      return null;
     }
 
     const data = await response.json();
-    // JSONBin возвращает данные внутри объекта record
     return data.record;
   } catch (error) {
-    console.error('Не удалось загрузить цены из облака:', error);
+    console.error('[API GET Catch]', error);
     return null;
   }
 };
 
-// Сохранение обновленного прайс-листа в облако
 export const updateCloudServices = async (newServicesList) => {
   try {
     const response = await fetch(BASE_URL, {
@@ -40,12 +40,15 @@ export const updateCloudServices = async (newServicesList) => {
     });
 
     if (!response.ok) {
-      throw new Error(`Ошибка обновления: ${response.status}`);
+      const errText = await response.text();
+      alert(`Ошибка сохранения в облако (${response.status}): ${errText}`);
+      return false;
     }
 
     return true;
   } catch (error) {
-    console.error('Не удалось сохранить цены в облако:', error);
+    alert(`Сетевая ошибка при отправке в облако: ${error.message}`);
     return false;
   }
 };
+
