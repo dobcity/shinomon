@@ -108,23 +108,35 @@ export default function App() {
   }, []);
 
   const loadData = async () => {
-    try {
-      const storedClasses = await AsyncStorage.getItem(STORAGE_KEYS.CLASSES);
+  try {
+    // 1. Загрузка классов авто
+    const storedClasses = await AsyncStorage.getItem(STORAGE_KEYS.CLASSES);
+    let loadedClasses = storedClasses ? JSON.parse(storedClasses) : DEFAULT_CLASSES;
+    setCarClasses(loadedClasses);
+    if (loadedClasses.length > 0) setSelectedClass(loadedClasses[0]);
+
+    // 2. ☁️ ЗАГРУЗКА УСЛУГ ИЗ ОБЛАКА
+    console.log('🔄 Запрашиваем услуги из облака...');
+    const cloudServices = await fetchCloudServices();
+
+    if (cloudServices && Array.isArray(cloudServices) && cloudServices.length > 0) {
+      console.log('✅ Применены услуги из облака:', cloudServices);
+      setServices(cloudServices);
+    } else {
+      console.warn('⚠️ Облако недоступно, загружаем из локальной памяти');
       const storedServices = await AsyncStorage.getItem(STORAGE_KEYS.SERVICES);
-      const storedOrders = await AsyncStorage.getItem(STORAGE_KEYS.ORDERS);
-
-      let loadedClasses = storedClasses ? JSON.parse(storedClasses) : DEFAULT_CLASSES;
-      setCarClasses(loadedClasses);
-      if (loadedClasses.length > 0) setSelectedClass(loadedClasses[0]);
-
-      if (storedServices) setServicesList(JSON.parse(storedServices));
-      if (storedOrders) setSavedOrders(JSON.parse(storedOrders));
-    } catch (e) {
-      console.error('Ошибка загрузки данных:', e);
-    } finally {
-      setIsLoaded(true);
+      setServices(storedServices ? JSON.parse(storedServices) : DEFAULT_SERVICES);
     }
-  };
+
+    // 3. Загрузка истории заказов
+    const storedOrders = await AsyncStorage.getItem(STORAGE_KEYS.ORDERS);
+    if (storedOrders) setOrders(JSON.parse(storedOrders));
+
+  } catch (e) {
+    console.error('Ошибка при загрузке данных:', e);
+  }
+};
+
 
   const handleHeaderTap = () => {
     const nextTap = tapCount + 1;
