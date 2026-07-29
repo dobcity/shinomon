@@ -70,19 +70,6 @@ export default function App() {
         }
       }
 
-      // 1. Обработка классов авто
-      if (loadedClasses && Array.isArray(loadedClasses) && loadedClasses.length > 0) {
-        setCarClasses(loadedClasses);
-        setSelectedClass(loadedClasses[0]);
-        await AsyncStorage.setItem(STORAGE_KEYS.CLASSES, JSON.stringify(loadedClasses));
-        console.log('✅ Классы авто загружены из облака');
-      } else {
-        const storedClasses = await AsyncStorage.getItem(STORAGE_KEYS.CLASSES);
-        const fallbackClasses = storedClasses ? JSON.parse(storedClasses) : DEFAULT_CLASSES;
-        setCarClasses(fallbackClasses);
-        if (fallbackClasses.length > 0) setSelectedClass(fallbackClasses[0]);
-      }
-
       // 2. Обработка услуг
       if (loadedServices && loadedServices.length > 0) {
         setServicesList(loadedServices);
@@ -90,7 +77,42 @@ export default function App() {
         console.log('✅ Услуги загружены из облака');
       } else {
         const storedServices = await AsyncStorage.getItem(STORAGE_KEYS.SERVICES);
-        setServicesList(storedServices ? JSON.parse(storedServices) : DEFAULT_SERVICES);
+        loadedServices = storedServices ? JSON.parse(storedServices) : DEFAULT_SERVICES;
+        setServicesList(loadedServices);
+      }
+
+      // 1. Обработка классов авто (из облака, либо динамически из ключей цен услуг)
+      if (loadedClasses && Array.isArray(loadedClasses) && loadedClasses.length > 0) {
+        setCarClasses(loadedClasses);
+        setSelectedClass(loadedClasses[0]);
+        await AsyncStorage.setItem(STORAGE_KEYS.CLASSES, JSON.stringify(loadedClasses));
+        console.log('✅ Классы авто загружены из облака');
+      } else if (loadedServices && loadedServices.length > 0 && loadedServices[0].prices) {
+        // Автоматически извлекаем актуальные классы из структуры цен
+        const classKeys = Object.keys(loadedServices[0].prices);
+        
+        const prettyNames = {
+          sedan: 'Седан',
+          crossover: 'Кроссовер',
+          'Внедорожники': 'Внедорожники',
+          'премиум': 'Премиум',
+          'Полный': 'Полный'
+        };
+
+        const derivedClasses = classKeys.map((key) => ({
+          id: key,
+          name: prettyNames[key] || key,
+        }));
+
+        setCarClasses(derivedClasses);
+        if (derivedClasses.length > 0) setSelectedClass(derivedClasses[0]);
+        await AsyncStorage.setItem(STORAGE_KEYS.CLASSES, JSON.stringify(derivedClasses));
+        console.log('✅ Классы авто успешно восстановлены из матрицы цен');
+      } else {
+        const storedClasses = await AsyncStorage.getItem(STORAGE_KEYS.CLASSES);
+        const fallbackClasses = storedClasses ? JSON.parse(storedClasses) : DEFAULT_CLASSES;
+        setCarClasses(fallbackClasses);
+        if (fallbackClasses.length > 0) setSelectedClass(fallbackClasses[0]);
       }
 
       // Загрузка истории заказов
