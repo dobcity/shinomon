@@ -11,7 +11,9 @@
     "react-dom": "*",
     "react-native": "*",
     "react-native-web": "*",
-    "@expo/metro-runtime": "*"
+    "@expo/metro-runtime": "*",
+    "@react-native-async-storage/async-storage": "*",
+    "expo-image-picker": "*"
   },
   "private": true
 }
