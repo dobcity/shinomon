@@ -13,15 +13,19 @@ export const SettingsTab = ({ servicesList, setServicesList, carClasses, onSaveS
     setEditPrices(JSON.parse(JSON.stringify(service.prices || {})));
   };
 
-  const handlePriceChange = (classId, radius, value) => {
-    setEditPrices((prev) => ({
-      ...prev,
-      [classId]: {
-        ...(prev[classId] || {}),
-        [radius]: value,
-      },
-    }));
-  };
+ const handlePriceChange = (classId, radius, value) => {
+  // Преобразуем текст из инпута в число (если пусто — ставим 0)
+  const numValue = value === '' ? 0 : Number(value);
+
+  setEditPrices((prev) => ({
+    ...prev,
+    [classId]: {
+      ...(prev[classId] || {}),
+      [radius]: isNaN(numValue) ? 0 : numValue,
+    },
+  }));
+};
+
 
   const handleSave = (id) => {
     const updated = servicesList.map((s) => {
