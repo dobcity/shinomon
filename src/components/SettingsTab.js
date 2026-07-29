@@ -4,9 +4,70 @@ import { updateCloudServices } from '../services/api';
 
 const ALL_RADII = ['R13', 'R14', 'R15', 'R16', 'R17', 'R18', 'R19', 'R20', 'R21', 'R22'];
 
-export function SettingsTab({ servicesList = [], setServicesList, carClasses = [], categories = ['Шиномонтаж', 'Ремонт'] }) {
+export function SettingsTab({ 
+  servicesList = [], 
+  setServicesList, 
+  carClasses = [], 
+  setCarClasses = () => {}, 
+  categories = ['Шиномонтаж', 'Ремонт'] 
+}) {
   const [newServiceName, setNewServiceName] = useState('');
+  const [newCarClassName, setNewCarClassName] = useState('');
   const [selectedCategory, setSelectedCategory] = useState(categories[0] || 'Шиномонтаж');
+
+  // Добавление нового класса автомобиля
+  const handleAddCarClass = async () => {
+    const trimmed = newCarClassName.trim();
+    if (!trimmed) {
+      Alert.alert('Ошибка', 'Введите название класса авто');
+      return;
+    }
+
+    if (carClasses.includes(trimmed)) {
+      Alert.alert('Ошибка', 'Такой класс уже существует');
+      return;
+    }
+
+    const updatedClasses = [...carClasses, trimmed];
+    setCarClasses(updatedClasses);
+
+    // Автоматически добавляем этот класс в матрицу цен существующих услуг со значением 0
+    const updatedServices = servicesList.map(service => ({
+      ...service,
+      prices: {
+        ...(service.prices || {}),
+        [trimmed]: ALL_RADII.reduce((acc, r) => ({ ...acc, [r]: 0 }), {})
+      }
+    }));
+
+    setServicesList(updatedServices);
+    await updateCloudServices(updatedServices);
+
+    setNewCarClassName('');
+    Alert.alert('Успех', `Класс "${trimmed}" успешно добавлен!`);
+  };
+
+  // Удаление класса автомобиля
+  const handleDeleteCarClass = async (classToDelete) => {
+    if (carClasses.length <= 1) {
+      Alert.alert('Ошибка', 'Должен остаться хотя бы один класс автомобиля');
+      return;
+    }
+
+    const updatedClasses = carClasses.filter(c => c !== classToDelete);
+    setCarClasses(updatedClasses);
+
+    // Удаляем этот класс из цен услуг
+    const updatedServices = servicesList.map(service => {
+      const newPrices = { ...(service.prices || {}) };
+      delete newPrices[classToDelete];
+      return { ...service, prices: newPrices };
+    });
+
+    setServicesList(updatedServices);
+    await updateCloudServices(updatedServices);
+    Alert.alert('Успех', `Класс "${classToDelete}" удален`);
+  };
 
   // Добавление новой услуги с пустой матрицей цен
   const handleAddService = async () => {
@@ -96,7 +157,36 @@ export function SettingsTab({ servicesList = [], setServicesList, carClasses = [
     <ScrollView style={styles.container}>
       <Text style={styles.title}>Панель управления ценами</Text>
       
-      {/* Карточка добавления */}
+      {/* Карточка управления классами авто */}
+      <View style={styles.card}>
+        <Text style={styles.label}>Классы автомобилей</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Новый класс (например: Премиум)"
+          placeholderTextColor="#999"
+          value={newCarClassName}
+          onChangeText={setNewCarClassName}
+        />
+        <TouchableOpacity style={[styles.button, styles.secondaryButton]} onPress={handleAddCarClass}>
+          <Text style={styles.buttonText}>Добавить класс авто</Text>
+        </TouchableOpacity>
+
+        <View style={styles.chipsContainer}>
+          {(carClasses || []).map((cls, idx) => {
+            const className = typeof cls === 'object' ? (cls.name || cls.id) : cls;
+            return (
+              <View key={idx} style={styles.chip}>
+                <Text style={styles.chipText}>{className}</Text>
+                <TouchableOpacity onPress={() => handleDeleteCarClass(className)}>
+                  <Text style={styles.chipDelete}>✕</Text>
+                </TouchableOpacity>
+              </View>
+            );
+          })}
+        </View>
+      </View>
+
+      {/* Карточка добавления услуги */}
       <View style={styles.card}>
         <Text style={styles.label}>Добавить новую услугу</Text>
         <TextInput
@@ -181,14 +271,19 @@ const styles = StyleSheet.create({
   label: { fontSize: 16, fontWeight: '600', marginBottom: 8, color: '#444' },
   input: { borderWidth: 1, borderColor: '#ddd', padding: 12, borderRadius: 8, marginBottom: 12, backgroundColor: '#fff', fontSize: 14 },
   button: { backgroundColor: '#007AFF', padding: 14, borderRadius: 8, alignItems: 'center' },
+  secondaryButton: { backgroundColor: '#5856D6', marginBottom: 12 },
   buttonText: { color: '#fff', fontWeight: 'bold', fontSize: 15 },
   saveAllButton: { backgroundColor: '#34C759', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 6 },
   saveAllButtonText: { color: '#fff', fontWeight: 'bold', fontSize: 13 },
+  chipsContainer: { flexDirection: 'row', flexWrap: 'wrap', marginTop: 4 },
+  chip: { flexDirection: 'row', backgroundColor: '#eef2f7', paddingVertical: 6, paddingHorizontal: 10, borderRadius: 16, marginRight: 8, marginBottom: 8, alignItems: 'center' },
+  chipText: { fontSize: 13, color: '#333', marginRight: 6 },
+  chipDelete: { fontSize: 13, color: '#ff3b30', fontWeight: 'bold' },
   serviceCard: { backgroundColor: '#fff', padding: 14, borderRadius: 10, marginBottom: 14, elevation: 2, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 3 },
   serviceHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, borderBottomWidth: 1, borderBottomColor: '#eee', paddingBottom: 8 },
   serviceName: { fontSize: 16, fontWeight: 'bold', color: '#333' },
   serviceCat: { fontSize: 12, color: '#888', marginTop: 2 },
-  deleteButton: { backgroundColor: '#ff3b30', горизонтальный: 10, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6 },
+  deleteButton: { backgroundColor: '#ff3b30', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6 },
   deleteButtonText: { color: '#fff', fontSize: 11, fontWeight: 'bold' },
   classRow: { marginBottom: 8, backgroundColor: '#fafafa', padding: 8, borderRadius: 6 },
   className: { fontSize: 14, fontWeight: '600', color: '#555', marginBottom: 4 },
