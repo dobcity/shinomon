@@ -5,6 +5,26 @@ const BIN_ID = '6a696f58da38895dfe9e2a0b';
 const API_KEY = '$2a$10$Q3PRvPm1RQEjwm7ll5VaPuDucTURtRSL23ltthf/WetwodziJe6um'; 
 
 const BASE_URL = `https://api.jsonbin.io/v3/b/${BIN_ID}`;
+export const fetchCloudServices = async () => {
+  try {
+    const response = await fetch(`${BASE_URL}/latest`, {
+      method: 'GET',
+      headers: { 'X-Master-Key': API_KEY },
+    });
+
+    const data = await response.json();
+    
+    // 🔍 ТЕСТОВЫЙ ВЫВОД В КОНСОЛЬ
+    console.log('--- ДАННЫЕ ИЗ ОБЛАКА ---', data.record);
+    console.log('Это массив?', Array.isArray(data.record));
+
+    return data.record;
+  } catch (error) {
+    console.error('Ошибка:', error);
+    return null;
+  }
+};
+
 
 export const fetchCloudServices = async () => {
   try {
