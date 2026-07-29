@@ -77,11 +77,10 @@ export default function App() {
     } catch (e) {
       console.error('Ошибка при локальной загрузке:', e);
     } finally {
-      // Приложение сразу разблокируется и запустится!
       setIsLoaded(true);
     }
 
-    // Фоновая синхронизация с облаком VK (без блокировки интерфейса)
+    // Фоновая синхронизация с облаком VK
     try {
       const cloudData = await fetchCloudServices();
       if (cloudData) {
@@ -105,10 +104,9 @@ export default function App() {
     loadData();
   }, []);
 
-  // 2. Сохранение цен администратором (Локально + Облако в фоне)
+  // 2. Сохранение цен администратором
   const handleSaveServices = async (newServices) => {
     setServicesList(newServices);
-    // ВСЕГДА сохраняем локально в первую очередь
     await AsyncStorage.setItem(STORAGE_KEYS.SERVICES, JSON.stringify(newServices));
     
     const payload = {
@@ -125,11 +123,10 @@ export default function App() {
     }
   };
 
-  // 3. Сохранение классов автомобилей (Локально + Облако в фоне)
+  // 3. Сохранение классов автомобилей
   const handleSaveCarClasses = async (newClasses) => {
     setCarClasses(newClasses);
     try {
-      // ВСЕГДА сохраняем локально в первую очередь
       await AsyncStorage.setItem(STORAGE_KEYS.CLASSES, JSON.stringify(newClasses));
 
       const payload = {
@@ -148,7 +145,7 @@ export default function App() {
     }
   };
 
-  // 4. Секретный вход для админа
+  // 4. Секретный вход/выход для админа
   const handleHeaderTap = () => {
     const nextTap = tapCount + 1;
     setTapCount(nextTap);
@@ -158,6 +155,7 @@ export default function App() {
 
       if (adminOverride) {
         setAdminOverride(false);
+        setActiveTab('calc'); // Возвращаем на вкладку расчёта при выходе
         Alert.alert('Выход', 'Режим администратора отключен.');
         return;
       }
@@ -256,6 +254,7 @@ export default function App() {
         <Text style={styles.headerTitle}>🛞 Шиномонтаж Pro</Text>
       </TouchableOpacity>
 
+      {/* Панель вкладок: История и Настройки скрыты, пока не введен ПИН-код */}
       <View style={styles.tabBar}>
         <TouchableOpacity
           style={[styles.tabButton, activeTab === 'calc' && styles.tabButtonActive]}
@@ -265,33 +264,25 @@ export default function App() {
           </Text>
         </TouchableOpacity>
         
-        <TouchableOpacity
-          style={[styles.tabButton, activeTab === 'history' && styles.tabButtonActive]}
-          onPress={() => {
-            if (!isAdmin) {
-              Alert.alert('Доступ ограничен', 'Раздел истории доступен только администратору. Нажмите 5 раз на заголовок "Шиномонтаж Pro" для входа.');
-              return;
-            }
-            setActiveTab('history');
-          }}>
-          <Text style={[styles.tabText, activeTab === 'history' && styles.tabTextActive]}>
-            📜 История ({savedOrders.length})
-          </Text>
-        </TouchableOpacity>
+        {isAdmin && (
+          <>
+            <TouchableOpacity
+              style={[styles.tabButton, activeTab === 'history' && styles.tabButtonActive]}
+              onPress={() => setActiveTab('history')}>
+              <Text style={[styles.tabText, activeTab === 'history' && styles.tabTextActive]}>
+                📜 История ({savedOrders.length})
+              </Text>
+            </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[styles.tabButton, activeTab === 'settings' && styles.tabButtonActive]}
-          onPress={() => {
-            if (!isAdmin) {
-              Alert.alert('Доступ ограничен', 'Раздел настроек доступен только администратору. Нажмите 5 раз на заголовок "Шиномонтаж Pro" для входа.');
-              return;
-            }
-            setActiveTab('settings');
-          }}>
-          <Text style={[styles.tabText, activeTab === 'settings' && styles.tabTextActive]}>
-            ⚙️ Настройки
-          </Text>
-        </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.tabButton, activeTab === 'settings' && styles.tabButtonActive]}
+              onPress={() => setActiveTab('settings')}>
+              <Text style={[styles.tabText, activeTab === 'settings' && styles.tabTextActive]}>
+                ⚙️ Настройки
+              </Text>
+            </TouchableOpacity>
+          </>
+        )}
       </View>
 
       {activeTab === 'calc' && (
