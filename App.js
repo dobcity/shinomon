@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { fetchCloudServices, updateCloudServices } from './src/services/api';
+
 import bridge from '@vkontakte/vk-bridge';
 import {
   SafeAreaView,
