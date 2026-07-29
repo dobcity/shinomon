@@ -15,7 +15,7 @@ export function SettingsTab({
   const [newCarClassName, setNewCarClassName] = useState('');
   const [selectedCategory, setSelectedCategory] = useState(categories[0] || 'Шиномонтаж');
 
-  // Добавление нового класса автомобиля
+  // Добавление нового класса автомобиля в виде объекта
   const handleAddCarClass = async () => {
     const trimmed = newCarClassName.trim();
     if (!trimmed) {
@@ -23,15 +23,27 @@ export function SettingsTab({
       return;
     }
 
-    if (carClasses.includes(trimmed)) {
+    // Проверяем, нет ли уже такого класса
+    const exists = carClasses.some(cls => {
+      const name = typeof cls === 'object' && cls !== null ? (cls.name || cls.id) : cls;
+      return name.toLowerCase() === trimmed.toLowerCase();
+    });
+
+    if (exists) {
       Alert.alert('Ошибка', 'Такой класс уже существует');
       return;
     }
 
-    const updatedClasses = [...carClasses, trimmed];
+    // Создаем объект класса, чтобы не ломать логику в калькуляторе и закатах
+    const newClassObj = {
+      id: trimmed,
+      name: trimmed
+    };
+
+    const updatedClasses = [...carClasses, newClassObj];
     setCarClasses(updatedClasses);
 
-    // Автоматически добавляем этот класс в матрицу цен существующих услуг со значением 0
+    // Добавляем этот класс в матрицу цен существующих услуг со значением 0
     const updatedServices = servicesList.map(service => ({
       ...service,
       prices: {
@@ -41,32 +53,59 @@ export function SettingsTab({
     }));
 
     setServicesList(updatedServices);
-    await updateCloudServices(updatedServices);
+    
+    try {
+      const success = await updateCloudServices(updatedServices);
+      if (success) {
+        Alert.alert('Успех', `Класс "${trimmed}" успешно добавлен и сохранен в облако!`);
+      } else {
+        Alert.alert('Внимание', 'Класс добавлен локально, но не удалось сохранить в облако.');
+      }
+    } catch (e) {
+      console.error('Ошибка облака:', e);
+      Alert.alert('Ошибка', 'Не удалось отправить данные в облако.');
+    }
 
     setNewCarClassName('');
-    Alert.alert('Успех', `Класс "${trimmed}" успешно добавлен!`);
   };
 
   // Удаление класса автомобиля
-  const handleDeleteCarClass = async (classToDelete) => {
+  const handleDeleteCarClass = async (carClassToRemove) => {
     if (carClasses.length <= 1) {
       Alert.alert('Ошибка', 'Должен остаться хотя бы один класс автомобиля');
       return;
     }
 
-    const updatedClasses = carClasses.filter(c => c !== classToDelete);
+    const classId = typeof carClassToRemove === 'object' && carClassToRemove !== null 
+      ? (carClassToRemove.id || carClassToRemove.name) 
+      : carClassToRemove;
+
+    const className = typeof carClassToRemove === 'object' && carClassToRemove !== null 
+      ? (carClassToRemove.name || carClassToRemove.id) 
+      : carClassToRemove;
+
+    const updatedClasses = carClasses.filter(c => {
+      const cId = typeof c === 'object' && c !== null ? (c.id || c.name) : c;
+      return cId !== classId;
+    });
+    
     setCarClasses(updatedClasses);
 
     // Удаляем этот класс из цен услуг
     const updatedServices = servicesList.map(service => {
       const newPrices = { ...(service.prices || {}) };
-      delete newPrices[classToDelete];
+      delete newPrices[classId];
       return { ...service, prices: newPrices };
     });
 
     setServicesList(updatedServices);
-    await updateCloudServices(updatedServices);
-    Alert.alert('Успех', `Класс "${classToDelete}" удален`);
+    
+    try {
+      await updateCloudServices(updatedServices);
+      Alert.alert('Успех', `Класс "${className}" удален`);
+    } catch (e) {
+      console.error('Ошибка удаления в облаке:', e);
+    }
   };
 
   // Добавление новой услуги с пустой матрицей цен
@@ -173,11 +212,11 @@ export function SettingsTab({
 
         <View style={styles.chipsContainer}>
           {(carClasses || []).map((cls, idx) => {
-            const className = typeof cls === 'object' ? (cls.name || cls.id) : cls;
+            const className = typeof cls === 'object' && cls !== null ? (cls.name || cls.id) : cls;
             return (
               <View key={idx} style={styles.chip}>
                 <Text style={styles.chipText}>{className}</Text>
-                <TouchableOpacity onPress={() => handleDeleteCarClass(className)}>
+                <TouchableOpacity onPress={() => handleDeleteCarClass(cls)}>
                   <Text style={styles.chipDelete}>✕</Text>
                 </TouchableOpacity>
               </View>
@@ -228,8 +267,8 @@ export function SettingsTab({
 
             {/* Цикл по классам автомобилей */}
             {(carClasses || []).map((carClass) => {
-              const classId = typeof carClass === 'object' ? (carClass.id || carClass.name) : carClass;
-              const className = typeof carClass === 'object' ? (carClass.name || carClass.id) : carClass;
+              const classId = typeof carClass === 'object' && carClass !== null ? (carClass.id || carClass.name) : carClass;
+              const className = typeof carClass === 'object' && carClass !== null ? (carClass.name || carClass.id) : carClass;
 
               return (
                 <View key={classId} style={styles.classRow}>
