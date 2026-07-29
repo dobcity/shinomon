@@ -1,7 +1,7 @@
 // Замените на ваши реальные значения из JSONBin.io
 
 // ⚠️ УБЕДИТЕСЬ, ЧТО ЗДЕСЬ ВСТАВЛЕНЫ НАСТОЯЩИЕ ЗНАЧЕНИЯ БЕЗ СКОБОК И ПРОБЕЛОВ!
-const BIN_ID = '6a6964f0da38895dfe9e0f3a';
+const BIN_ID = '6a696f58da38895dfe9e2a0b';
 const API_KEY = '$2a$10$Q3PRvPm1RQEjwm7ll5VaPuDucTURtRSL23ltthf/WetwodziJe6um'; 
 
 const BASE_URL = `https://api.jsonbin.io/v3/b/${BIN_ID}`;
