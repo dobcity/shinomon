@@ -50,69 +50,62 @@ export default function App() {
   const [carPhoto, setCarPhoto] = useState(null);
   const [selectedCategory, setSelectedCategory] = useState('Все');
 
-  // 1. Загрузка данных при старте (Облако + Локально)
+  // 1. Загрузка данных при старте (Облако VK + Локально)
   const loadData = async () => {
     try {
-      console.log('🔄 Запрашиваем данные из облака...');
-      const cloudData = await fetchCloudServices(); // Получаем данные из jsonbin.io
+      console.log('🔄 Запрашиваем данные из облака VK...');
+      const cloudData = await fetchCloudServices(); // Запрос через VK Storage
 
-      let loadedServices = [];
+      let loadedServices = null;
       let loadedClasses = null;
 
       if (cloudData) {
-        if (!Array.isArray(cloudData) && cloudData.services) {
-          // Новый формат: объект с классами и услугами
-          loadedServices = cloudData.services;
-          loadedClasses = cloudData.carClasses;
-        } else if (Array.isArray(cloudData)) {
-          // Старый формат: только массив услуг
-          loadedServices = cloudData;
-        }
+        loadedServices = cloudData.services;
+        loadedClasses = cloudData.carClasses;
       }
 
       // 2. Обработка услуг
-      if (loadedServices && loadedServices.length > 0) {
+      if (loadedServices && Array.isArray(loadedServices) && loadedServices.length > 0) {
         setServicesList(loadedServices);
         await AsyncStorage.setItem(STORAGE_KEYS.SERVICES, JSON.stringify(loadedServices));
-        console.log('✅ Услуги загружены из облака');
+        console.log('✅ Услуги загружены из облака VK');
       } else {
         const storedServices = await AsyncStorage.getItem(STORAGE_KEYS.SERVICES);
-        loadedServices = storedServices ? JSON.parse(storedServices) : DEFAULT_SERVICES;
-        setServicesList(loadedServices);
+        setServicesList(storedServices ? JSON.parse(storedServices) : DEFAULT_SERVICES);
       }
 
-      // 1. Обработка классов авто (из облака, либо динамически из ключей цен услуг)
+      // 3. Обработка классов авто
       if (loadedClasses && Array.isArray(loadedClasses) && loadedClasses.length > 0) {
         setCarClasses(loadedClasses);
         setSelectedClass(loadedClasses[0]);
         await AsyncStorage.setItem(STORAGE_KEYS.CLASSES, JSON.stringify(loadedClasses));
-        console.log('✅ Классы авто загружены из облака');
-      } else if (loadedServices && loadedServices.length > 0 && loadedServices[0].prices) {
-        // Автоматически извлекаем актуальные классы из структуры цен
-        const classKeys = Object.keys(loadedServices[0].prices);
-        
-        const prettyNames = {
-          sedan: 'Седан',
-          crossover: 'Кроссовер',
-          'Внедорожники': 'Внедорожники',
-          'премиум': 'Премиум',
-          'Полный': 'Полный'
-        };
-
-        const derivedClasses = classKeys.map((key) => ({
-          id: key,
-          name: prettyNames[key] || key,
-        }));
-
-        setCarClasses(derivedClasses);
-        if (derivedClasses.length > 0) setSelectedClass(derivedClasses[0]);
-        await AsyncStorage.setItem(STORAGE_KEYS.CLASSES, JSON.stringify(derivedClasses));
-        console.log('✅ Классы авто успешно восстановлены из матрицы цен');
+        console.log('✅ Классы авто загружены из облака VK');
       } else {
-        const storedClasses = await AsyncStorage.getItem(STORAGE_KEYS.CLASSES);
-        const fallbackClasses = storedClasses ? JSON.parse(storedClasses) : DEFAULT_CLASSES;
-        setCarClasses(fallbackClasses);
-        if (fallbackClasses.length > 0) setSelectedClass(fallbackClasses[0]);
+        const currentServices = loadedServices || servicesList;
+        if (currentServices.length > 0 && currentServices[0].prices) {
+          const classKeys = Object.keys(currentServices[0].prices);
+          const prettyNames = {
+            sedan: 'Седан',
+            crossover: 'Кроссовер',
+            'Внедорожники': 'Внедорожники',
+            'премиум': 'Премиум',
+            'Полный': 'Полный',
+          };
+
+          const derivedClasses = classKeys.map((key) => ({
+            id: key,
+            name: prettyNames[key] || key,
+          }));
+
+          setCarClasses(derivedClasses);
+          if (derivedClasses.length > 0) setSelectedClass(derivedClasses[0]);
+          await AsyncStorage.setItem(STORAGE_KEYS.CLASSES, JSON.stringify(derivedClasses));
+        } else {
+          const storedClasses = await AsyncStorage.getItem(STORAGE_KEYS.CLASSES);
+          const fallbackClasses = storedClasses ? JSON.parse(storedClasses) : DEFAULT_CLASSES;
+          setCarClasses(fallbackClasses);
+          if (fallbackClasses.length > 0) setSelectedClass(fallbackClasses[0]);
+        }
       }
 
       // Загрузка истории заказов
@@ -121,7 +114,6 @@ export default function App() {
 
     } catch (e) {
       console.error('Ошибка при загрузке данных:', e);
-      // Фолбэк на локальное хранилище при сбое сети
       const storedClasses = await AsyncStorage.getItem(STORAGE_KEYS.CLASSES);
       if (storedClasses) {
         const parsed = JSON.parse(storedClasses);
@@ -140,11 +132,10 @@ export default function App() {
     loadData();
   }, []);
 
-  // 2. Сохранение цен администратором (Облако + Локально)
+  // 2. Сохранение цен администратором (Облако VK + Локально)
   const handleSaveServices = async (newServices) => {
     setServicesList(newServices);
     
-    // Формируем общий пакет для облака (услуги + текущие классы)
     const payload = {
       services: newServices,
       carClasses: carClasses
@@ -154,19 +145,18 @@ export default function App() {
 
     if (isSuccess) {
       await AsyncStorage.setItem(STORAGE_KEYS.SERVICES, JSON.stringify(newServices));
-      Alert.alert('Успех', 'Новые цены сохранены в облаке и обновлены у всех клиентов!');
+      Alert.alert('Успех', 'Новые цены сохранены в облаке VK!');
     } else {
-      Alert.alert('Ошибка', 'Не удалось отправить данные в облако. Проверьте подключение.');
+      Alert.alert('Ошибка', 'Не удалось отправить данные в облако VK.');
     }
   };
 
-  // 3. Сохранение классов автомобилей (Локально + Облако)
+  // 3. Сохранение классов автомобилей
   const handleSaveCarClasses = async (newClasses) => {
     setCarClasses(newClasses);
     try {
       await AsyncStorage.setItem(STORAGE_KEYS.CLASSES, JSON.stringify(newClasses));
 
-      // Отправляем в облако полный пакет (текущие услуги + новые классы)
       const payload = {
         services: servicesList,
         carClasses: newClasses
@@ -174,16 +164,16 @@ export default function App() {
       
       const isSuccess = await updateCloudServices(payload);
       if (isSuccess) {
-        Alert.alert('Успех', 'Классы авто сохранены в облако!');
+        Alert.alert('Успех', 'Классы авто сохранены в облако VK!');
       } else {
-        Alert.alert('Внимание', 'Сохранено локально, но не удалось отправить в облако.');
+        Alert.alert('Внимание', 'Сохранено локально, но не удалось отправить в облако VK.');
       }
     } catch (e) {
-      console.error('Ошибка сохранения классов в хранилище:', e);
+      console.error('Ошибка сохранения классов:', e);
     }
   };
 
-  // 4. Секретный вход для админа
+  // 4. Секретный вход для админа (тап по заголовку 5 раз)
   const handleHeaderTap = () => {
     const nextTap = tapCount + 1;
     setTapCount(nextTap);
@@ -291,34 +281,47 @@ export default function App() {
         <Text style={styles.headerTitle}>🛞 Шиномонтаж Pro</Text>
       </TouchableOpacity>
 
-      {isAdmin && (
-        <View style={styles.tabBar}>
-          <TouchableOpacity
-            style={[styles.tabButton, activeTab === 'calc' && styles.tabButtonActive]}
-            onPress={() => setActiveTab('calc')}>
-            <Text style={[styles.tabText, activeTab === 'calc' && styles.tabTextActive]}>
-              🧮 Расчёт
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.tabButton, activeTab === 'history' && styles.tabButtonActive]}
-            onPress={() => setActiveTab('history')}>
-            <Text style={[styles.tabText, activeTab === 'history' && styles.tabTextActive]}>
-              📜 История ({savedOrders.length})
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.tabButton, activeTab === 'settings' && styles.tabButtonActive]}
-            onPress={() => setActiveTab('settings')}>
-            <Text style={[styles.tabText, activeTab === 'settings' && styles.tabTextActive]}>
-              ⚙️ Настройки
-            </Text>
-          </TouchableOpacity>
-        </View>
-      )}
+      {/* Панель вкладок теперь отображается всегда, а вкладки История/Настройки доступны администратору */}
+      <View style={styles.tabBar}>
+        <TouchableOpacity
+          style={[styles.tabButton, activeTab === 'calc' && styles.tabButtonActive]}
+          onPress={() => setActiveTab('calc')}>
+          <Text style={[styles.tabText, activeTab === 'calc' && styles.tabTextActive]}>
+            🧮 Расчёт
+          </Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity
+          style={[styles.tabButton, activeTab === 'history' && styles.tabButtonActive]}
+          onPress={() => {
+            if (!isAdmin) {
+              Alert.alert('Доступ ограничен', 'Раздел истории доступен только администратору. Нажмите 5 раз на заголовок "Шиномонтаж Pro" для входа.');
+              return;
+            }
+            setActiveTab('history');
+          }}>
+          <Text style={[styles.tabText, activeTab === 'history' && styles.tabTextActive]}>
+            📜 История ({savedOrders.length})
+          </Text>
+        </TouchableOpacity>
 
-      {/* Переключение вкладок */}
-      {(activeTab === 'calc' || !isAdmin) && (
+        <TouchableOpacity
+          style={[styles.tabButton, activeTab === 'settings' && styles.tabButtonActive]}
+          onPress={() => {
+            if (!isAdmin) {
+              Alert.alert('Доступ ограничен', 'Раздел настроек доступен только администратору. Нажмите 5 раз на заголовок "Шиномонтаж Pro" для входа.');
+              return;
+            }
+            setActiveTab('settings');
+          }}>
+          <Text style={[styles.tabText, activeTab === 'settings' && styles.tabTextActive]}>
+            ⚙️ Настройки
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Содержимое вкладок */}
+      {activeTab === 'calc' && (
         <CalculatorTab
           carClasses={carClasses}
           selectedClass={selectedClass}
