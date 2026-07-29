@@ -1,14 +1,5 @@
-// Замените на ваши реальные значения из JSONBin.io
-console.log('🚀 Файл api.js успешно загрузился!');
-
-// Дальше ваш основной код...
-
-// ⚠️ УБЕДИТЕСЬ, ЧТО ЗДЕСЬ ВСТАВЛЕНЫ НАСТОЯЩИЕ ЗНАЧЕНИЯ БЕЗ СКОБОК И ПРОБЕЛОВ!
-
-
-// ⚠️ Замените на ваши реальные данные из JSONBin.io
 const BIN_ID = '6a696f58da38895dfe9e2a0b';
-const API_KEY = '$2a$10$Q3PRvPm1RQEjwm7ll5VaPuDucTURtRSL23ltthf/WetwodziJe6um'; 
+const API_KEY = '$2a$10$Q3PRvPm1RQEjwm7ll5VaPuDucTURtRSL23ltthf/WetwodziJe6um';
 
 const BASE_URL = `https://api.jsonbin.io/v3/b/${BIN_ID}`;
 
@@ -17,7 +8,9 @@ export const fetchCloudServices = async () => {
     const response = await fetch(`${BASE_URL}/latest`, {
       method: 'GET',
       headers: {
+        'Content-Type': 'application/json',
         'X-Master-Key': API_KEY,
+        'X-Bin-Meta': 'false', // 👈 Возвращает массив напрямую, убирает метаданные
       },
     });
 
@@ -27,14 +20,7 @@ export const fetchCloudServices = async () => {
     }
 
     const data = await response.json();
-
-    // 🔍 ТЕСТОВЫЙ ВЫВОД В КОНСОЛЬ
-   // Замените console.log на alert:
-
-
-    console.log('Это массив?', Array.isArray(data.record));
-
-    return data.record;
+    return data; // За счет X-Bin-Meta: false здесь сразу лежит ваш массив
   } catch (error) {
     console.error('[API GET Catch]', error);
     return null;
@@ -54,7 +40,7 @@ export const updateCloudServices = async (newServicesList) => {
 
     if (!response.ok) {
       const errText = await response.text();
-      console.error(` Ошибка сохранения в облако (${response.status}): ${errText}`);
+      console.error(`Ошибка сохранения в облако (${response.status}): ${errText}`);
       return false;
     }
 
@@ -64,4 +50,3 @@ export const updateCloudServices = async (newServicesList) => {
     return false;
   }
 };
-
