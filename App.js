@@ -1,13 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import bridge from '@vkontakte/vk-bridge';
-import React, { useEffect } from 'react';
-import bridge from '@vkontakte/vk-bridge';
 
 export default function App() {
   useEffect(() => {
-    // Сообщаем ВКонтакте, что приложение загрузилось
     bridge.send('VKWebAppInit');
   }, []);
+
 
   // ... далее весь ваш существующий код калькулятора ...
 
