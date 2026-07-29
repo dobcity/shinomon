@@ -388,13 +388,11 @@ export default function App() {
           carClasses={carClasses}
           setCarClasses={handleSaveCarClasses}
           onSaveServices={handleSaveServices}
-          serviceCategories={serviceCategories}
-          setServiceCategories={handleSaveCategories}
+          categories={serviceCategories}       // ✅ Передаем список категорий
+          setCategories={handleSaveCategories}   // ✅ Передаем функцию сохранения категорий
         />
       )}
-    </SafeAreaView>
-  );
-}
+
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f4f6f8' },
