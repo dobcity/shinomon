@@ -50,91 +50,66 @@ export default function App() {
   const [carPhoto, setCarPhoto] = useState(null);
   const [selectedCategory, setSelectedCategory] = useState('Все');
 
-  // 1. Загрузка данных при старте (Облако VK + Локально)
+  // 1. Загрузка данных (Local-First: сначала из памяти для мгновенного запуска)
   const loadData = async () => {
     try {
-      console.log('🔄 Запрашиваем данные из облака VK...');
-      const cloudData = await fetchCloudServices(); // Запрос через VK Storage
-
-      let loadedServices = null;
-      let loadedClasses = null;
-
-      if (cloudData) {
-        loadedServices = cloudData.services;
-        loadedClasses = cloudData.carClasses;
-      }
-
-      // 2. Обработка услуг
-      if (loadedServices && Array.isArray(loadedServices) && loadedServices.length > 0) {
-        setServicesList(loadedServices);
-        await AsyncStorage.setItem(STORAGE_KEYS.SERVICES, JSON.stringify(loadedServices));
-        console.log('✅ Услуги загружены из облака VK');
+      const storedServices = await AsyncStorage.getItem(STORAGE_KEYS.SERVICES);
+      if (storedServices) {
+        setServicesList(JSON.parse(storedServices));
       } else {
-        const storedServices = await AsyncStorage.getItem(STORAGE_KEYS.SERVICES);
-        setServicesList(storedServices ? JSON.parse(storedServices) : DEFAULT_SERVICES);
+        setServicesList(DEFAULT_SERVICES);
       }
 
-      // 3. Обработка классов авто
-      if (loadedClasses && Array.isArray(loadedClasses) && loadedClasses.length > 0) {
-        setCarClasses(loadedClasses);
-        setSelectedClass(loadedClasses[0]);
-        await AsyncStorage.setItem(STORAGE_KEYS.CLASSES, JSON.stringify(loadedClasses));
-        console.log('✅ Классы авто загружены из облака VK');
-      } else {
-        const currentServices = loadedServices || servicesList;
-        if (currentServices.length > 0 && currentServices[0].prices) {
-          const classKeys = Object.keys(currentServices[0].prices);
-          const prettyNames = {
-            sedan: 'Седан',
-            crossover: 'Кроссовер',
-            'Внедорожники': 'Внедорожники',
-            'премиум': 'Премиум',
-            'Полный': 'Полный',
-          };
-
-          const derivedClasses = classKeys.map((key) => ({
-            id: key,
-            name: prettyNames[key] || key,
-          }));
-
-          setCarClasses(derivedClasses);
-          if (derivedClasses.length > 0) setSelectedClass(derivedClasses[0]);
-          await AsyncStorage.setItem(STORAGE_KEYS.CLASSES, JSON.stringify(derivedClasses));
-        } else {
-          const storedClasses = await AsyncStorage.getItem(STORAGE_KEYS.CLASSES);
-          const fallbackClasses = storedClasses ? JSON.parse(storedClasses) : DEFAULT_CLASSES;
-          setCarClasses(fallbackClasses);
-          if (fallbackClasses.length > 0) setSelectedClass(fallbackClasses[0]);
-        }
-      }
-
-      // Загрузка истории заказов
-      const storedOrders = await AsyncStorage.getItem(STORAGE_KEYS.ORDERS);
-      if (storedOrders) setSavedOrders(JSON.parse(storedOrders));
-
-    } catch (e) {
-      console.error('Ошибка при загрузке данных:', e);
       const storedClasses = await AsyncStorage.getItem(STORAGE_KEYS.CLASSES);
       if (storedClasses) {
         const parsed = JSON.parse(storedClasses);
         setCarClasses(parsed);
         if (parsed.length > 0) setSelectedClass(parsed[0]);
+      } else {
+        setCarClasses(DEFAULT_CLASSES);
+        if (DEFAULT_CLASSES.length > 0) setSelectedClass(DEFAULT_CLASSES[0]);
       }
-      const storedServices = await AsyncStorage.getItem(STORAGE_KEYS.SERVICES);
-      if (storedServices) setServicesList(JSON.parse(storedServices));
+
+      const storedOrders = await AsyncStorage.getItem(STORAGE_KEYS.ORDERS);
+      if (storedOrders) {
+        setSavedOrders(JSON.parse(storedOrders));
+      }
+    } catch (e) {
+      console.error('Ошибка при локальной загрузке:', e);
     } finally {
+      // Приложение сразу разблокируется и запустится!
       setIsLoaded(true);
+    }
+
+    // Фоновая синхронизация с облаком VK (без блокировки интерфейса)
+    try {
+      const cloudData = await fetchCloudServices();
+      if (cloudData) {
+        if (cloudData.services && Array.isArray(cloudData.services) && cloudData.services.length > 0) {
+          setServicesList(cloudData.services);
+          await AsyncStorage.setItem(STORAGE_KEYS.SERVICES, JSON.stringify(cloudData.services));
+        }
+        if (cloudData.carClasses && Array.isArray(cloudData.carClasses) && cloudData.carClasses.length > 0) {
+          setCarClasses(cloudData.carClasses);
+          setSelectedClass(cloudData.carClasses[0]);
+          await AsyncStorage.setItem(STORAGE_KEYS.CLASSES, JSON.stringify(cloudData.carClasses));
+        }
+      }
+    } catch (e) {
+      console.log('Фоновая синхронизация пропущена');
     }
   };
 
   useEffect(() => {
-    bridge.send('VKWebAppInit');
+    bridge.send('VKWebAppInit').catch(() => {});
     loadData();
   }, []);
 
-  // 2. Сохранение цен администратором (Облако VK + Локально)
+  // 2. Сохранение цен администратором (Локально + Облако в фоне)
   const handleSaveServices = async (newServices) => {
     setServicesList(newServices);
+    // ВСЕГДА сохраняем локально в первую очередь
+    await AsyncStorage.setItem(STORAGE_KEYS.SERVICES, JSON.stringify(newServices));
     
     const payload = {
       services: newServices,
@@ -144,17 +119,17 @@ export default function App() {
     const isSuccess = await updateCloudServices(payload);
 
     if (isSuccess) {
-      await AsyncStorage.setItem(STORAGE_KEYS.SERVICES, JSON.stringify(newServices));
-      Alert.alert('Успех', 'Новые цены сохранены в облаке VK!');
+      Alert.alert('Успех', 'Цены сохранены локально и синхронизированы с облаком VK!');
     } else {
-      Alert.alert('Ошибка', 'Не удалось отправить данные в облако VK.');
+      Alert.alert('Сохранено', 'Цены сохранены на устройстве (облако VK было недоступно).');
     }
   };
 
-  // 3. Сохранение классов автомобилей
+  // 3. Сохранение классов автомобилей (Локально + Облако в фоне)
   const handleSaveCarClasses = async (newClasses) => {
     setCarClasses(newClasses);
     try {
+      // ВСЕГДА сохраняем локально в первую очередь
       await AsyncStorage.setItem(STORAGE_KEYS.CLASSES, JSON.stringify(newClasses));
 
       const payload = {
@@ -164,16 +139,16 @@ export default function App() {
       
       const isSuccess = await updateCloudServices(payload);
       if (isSuccess) {
-        Alert.alert('Успех', 'Классы авто сохранены в облако VK!');
+        Alert.alert('Успех', 'Классы авто сохранены локально и в облако VK!');
       } else {
-        Alert.alert('Внимание', 'Сохранено локально, но не удалось отправить в облако VK.');
+        Alert.alert('Сохранено', 'Классы авто сохранены на устройстве (облако VK было недоступно).');
       }
     } catch (e) {
       console.error('Ошибка сохранения классов:', e);
     }
   };
 
-  // 4. Секретный вход для админа (тап по заголовку 5 раз)
+  // 4. Секретный вход для админа
   const handleHeaderTap = () => {
     const nextTap = tapCount + 1;
     setTapCount(nextTap);
@@ -281,7 +256,6 @@ export default function App() {
         <Text style={styles.headerTitle}>🛞 Шиномонтаж Pro</Text>
       </TouchableOpacity>
 
-      {/* Панель вкладок теперь отображается всегда, а вкладки История/Настройки доступны администратору */}
       <View style={styles.tabBar}>
         <TouchableOpacity
           style={[styles.tabButton, activeTab === 'calc' && styles.tabButtonActive]}
@@ -320,7 +294,6 @@ export default function App() {
         </TouchableOpacity>
       </View>
 
-      {/* Содержимое вкладок */}
       {activeTab === 'calc' && (
         <CalculatorTab
           carClasses={carClasses}
